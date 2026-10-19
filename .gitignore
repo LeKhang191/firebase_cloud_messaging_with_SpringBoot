@@ -1,0 +1,8 @@
+target/
+data/
+*.iml
+.idea/
+.vscode/
+# Not commit for locking service account
+firebase-service-account.json
+src/main/resources/static/firebase-config.js
