@@ -6,3 +6,6 @@ data/
 # Not commit for locking service account
 firebase-service-account.json
 src/main/resources/static/firebase-config.js
+
+# cong cu portable do setup-and-test tai ve
+.tools/
