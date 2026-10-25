@@ -36,7 +36,7 @@ java_major() {
 locate_jdk_home() {
   local target_dir="$1"
   local javac_bin
-  javac_bin="$(find "$target_dir" -type f -name javac 2>/dev/null | head -1)"
+  javac_bin="$(find "$target_dir" -type f -name javac -print -quit 2>/dev/null)"
   if [ -n "$javac_bin" ]; then
     dirname "$(dirname "$javac_bin")"
   fi
@@ -44,7 +44,7 @@ locate_jdk_home() {
 
 # ---------------------------------------------------------------- locate a suitable JDK (17-21)
 use_jdk() {
-  if command -v java >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; then
+  if [ "${FCM_FORCE_PORTABLE_TOOLS:-0}" != "1" ] && command -v java >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; then
     local v; v="$(java_major "$(command -v java)")"
     if [ "${v:-0}" -ge "$MIN_JAVA" ] && [ "${v:-0}" -le "$MAX_JAVA" ]; then ok "Use JDK $v of system."; return; fi
     warn "JDK system is version $v (need $MIN_JAVA-$MAX_JAVA) -> skipping, looking for portable JDK."
@@ -67,7 +67,7 @@ use_jdk() {
 
 # ---------------------------------------------------------------- locate Maven
 use_maven() {
-  if command -v mvn >/dev/null 2>&1; then ok "Use Maven of system."; return; fi
+  if [ "${FCM_FORCE_PORTABLE_TOOLS:-0}" != "1" ] && command -v mvn >/dev/null 2>&1; then ok "Use Maven of system."; return; fi
   if [ -x "$TOOLS/maven/bin/mvn" ]; then
     export PATH="$TOOLS/maven/bin:$PATH"; ok "Use portable Maven: $TOOLS/maven"; return
   fi
@@ -86,7 +86,7 @@ grep -q "spring-boot-starter-test" pom.xml \
 
 echo
 if [ "$#" -eq 0 ]; then set -- test; fi
-say "JDK currently in use: $(java -version 2>&1 | head -1)"
+say "JDK currently in use: $(java -version 2>&1 | sed -n '1p')"
 say "Running: mvn -B $*"
 set +e
 mvn -B "$@"
@@ -99,7 +99,7 @@ if [ "$code" -eq 0 ]; then
 else
   warn "Some tests failed (exit $code). See details: target/surefire-reports/com.seminar.fcm.FcmFlowTest.txt"
   echo
-  say "JDK currently in use: $(java -version 2>&1 | head -1)"
+  say "JDK currently in use: $(java -version 2>&1 | sed -n '1p')"
   say "Root cause (first 'Caused by' lines):"
   { grep -h "Caused by" target/surefire-reports/*.txt 2>/dev/null | awk '!seen[$0]++' | head -6 | cut -c1-400; } || true
   echo

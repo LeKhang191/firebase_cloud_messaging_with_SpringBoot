@@ -42,14 +42,20 @@ jobs:
         os: [macos-latest, ubuntu-latest]
     env:
       CLEAN_PATH: /usr/bin:/bin:/usr/sbin:/sbin
+      FCM_FORCE_PORTABLE_TOOLS: "1"
     steps:
       - uses: actions/checkout@v4
 
-      - name: setup.sh (install environment)
-        run: env -u JAVA_HOME PATH="$CLEAN_PATH" /bin/bash ./setup.sh
+      - name: setup.sh (install portable environment)
+        run: env -u JAVA_HOME FCM_FORCE_PORTABLE_TOOLS="$FCM_FORCE_PORTABLE_TOOLS" PATH="$CLEAN_PATH" /bin/bash ./setup.sh
 
-      - name: test.sh (run autotests)
-        run: env -u JAVA_HOME PATH="$CLEAN_PATH" /bin/bash ./test.sh
+      - name: Verify portable toolchain
+        run: |
+          test -x .tools/jdk/bin/javac -o -x .tools/jdk/Contents/Home/bin/javac
+          test -x .tools/maven/bin/mvn
+
+      - name: test.sh (run autotests with portable tools)
+        run: env -u JAVA_HOME FCM_FORCE_PORTABLE_TOOLS="$FCM_FORCE_PORTABLE_TOOLS" PATH="$CLEAN_PATH" /bin/bash ./test.sh
 
       - name: Upload test reports on failure
         if: failure()

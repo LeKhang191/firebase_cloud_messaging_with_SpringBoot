@@ -68,14 +68,14 @@ esac
 locate_jdk_home() {
   local target_dir="$1"
   local javac_bin
-  javac_bin="$(find "$target_dir" -type f -name javac 2>/dev/null | head -1)"
+  javac_bin="$(find "$target_dir" -type f -name javac -print -quit 2>/dev/null)"
   if [ -n "$javac_bin" ]; then
     dirname "$(dirname "$javac_bin")"
   fi
 }
 
 ensure_jdk() {
-  if command -v java >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; then
+  if [ "${FCM_FORCE_PORTABLE_TOOLS:-0}" != "1" ] && command -v java >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; then
     local v; v="$(java_major "$(command -v java)")"
     if [ "${v:-0}" -ge "$MIN_JAVA" ] && [ "${v:-0}" -le "$MAX_JAVA" ]; then
       ok "JDK $v found on this machine - skipping install."
@@ -116,7 +116,7 @@ ensure_jdk() {
 }
 
 ensure_maven() {
-  if command -v mvn >/dev/null 2>&1; then
+  if [ "${FCM_FORCE_PORTABLE_TOOLS:-0}" != "1" ] && command -v mvn >/dev/null 2>&1; then
     ok "Maven found on this machine - skipping install."
     return
   fi
@@ -180,7 +180,7 @@ ensure_maven
 ensure_project
 
 echo
-java -version 2>&1 | head -1
-mvn -v 2>&1 | head -1
+java -version 2>&1 | sed -n '1p'
+mvn -v 2>&1 | sed -n '1p'
 echo
 ok "Environment ready. Run the tests with: ./test.sh"
