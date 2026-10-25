@@ -9,7 +9,7 @@ TOOLS="$ROOT/.tools"
 JDK_DIR="$TOOLS/jdk"
 MVN_DIR="$TOOLS/maven"
 MIN_JAVA=17
-MAX_JAVA=21   # Spring Boot 3.3.x + Mockito are not reliable on JDK newer than 21
+MAX_JAVA=21
 JDK_VERSION=17
 MAVEN_VERSION="3.9.9"
 TEST_FILE="src/test/java/com/seminar/fcm/FcmFlowTest.java"
@@ -25,7 +25,7 @@ download() {
   elif command -v wget >/dev/null 2>&1; then
     wget -q --show-progress "$1" -O "$2"
   else
-    die "'curl' or 'wget' is required to download files (e.g. sudo apt install curl)."
+    die "'curl' or 'wget' is required to download files (e.g. brew install curl / apt install curl)."
   fi
 }
 
@@ -41,7 +41,7 @@ download_any() {
   die "Could not download from any source. Check your network / VPN / proxy / firewall."
 }
 
-need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing command '$1'. Install it first (e.g. sudo apt install $1)."; }
+need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing command '$1'. Install it first."; }
 
 java_major() {
   local out
@@ -58,11 +58,21 @@ case "$(uname -s)" in
   Darwin*) ADOPT_OS="mac" ;;
   *) die "Operating system '$(uname -s)' is not supported by .sh scripts. On Windows use setup.bat" ;;
 esac
+
 case "$(uname -m)" in
   x86_64|amd64)  ADOPT_ARCH="x64" ;;
   arm64|aarch64) ADOPT_ARCH="aarch64" ;;
   *) die "CPU architecture '$(uname -m)' is not supported." ;;
 esac
+
+locate_jdk_home() {
+  local target_dir="$1"
+  local javac_bin
+  javac_bin="$(find "$target_dir" -type f -name javac 2>/dev/null | head -1)"
+  if [ -n "$javac_bin" ]; then
+    dirname "$(dirname "$javac_bin")"
+  fi
+}
 
 ensure_jdk() {
   if command -v java >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; then
@@ -71,13 +81,13 @@ ensure_jdk() {
       ok "JDK $v found on this machine - skipping install."
       return
     fi
-    warn "JDK on this machine is version $v (need $MIN_JAVA-$MAX_JAVA) - using a portable JDK $JDK_VERSION."
+    warn "JDK on this machine is version $v (need $MIN_JAVA-$MAX_JAVA) - using portable JDK $JDK_VERSION."
   fi
 
   local home=""
-  for cand in "$JDK_DIR/Contents/Home" "$JDK_DIR"; do
-    [ -x "$cand/bin/javac" ] && home="$cand" && break
-  done
+  if [ -d "$JDK_DIR" ]; then
+    home="$(locate_jdk_home "$JDK_DIR")"
+  fi
 
   if [ -z "$home" ]; then
     need_cmd tar
@@ -88,10 +98,14 @@ ensure_jdk() {
     rm -rf "$JDK_DIR"; mkdir -p "$JDK_DIR"
     tar -xzf "$archive" -C "$JDK_DIR" --strip-components=1
     rm -f "$archive"
-    for cand in "$JDK_DIR/Contents/Home" "$JDK_DIR"; do
-      [ -x "$cand/bin/javac" ] && home="$cand" && break
-    done
+
+    home="$(locate_jdk_home "$JDK_DIR")"
     [ -n "$home" ] || die "JDK extracted but bin/javac was not found."
+
+    if [ "$ADOPT_OS" = "mac" ] && command -v xattr >/dev/null 2>&1; then
+      xattr -dr com.apple.quarantine "$JDK_DIR" 2>/dev/null || true
+    fi
+
     ok "Portable JDK installed at $home"
   else
     ok "Using existing portable JDK at $home"
@@ -119,6 +133,11 @@ ensure_maven() {
     rm -rf "$MVN_DIR"; mkdir -p "$MVN_DIR"
     tar -xzf "$archive" -C "$MVN_DIR" --strip-components=1
     rm -f "$archive"
+
+    if [ "$ADOPT_OS" = "mac" ] && command -v xattr >/dev/null 2>&1; then
+      xattr -dr com.apple.quarantine "$MVN_DIR" 2>/dev/null || true
+    fi
+
     ok "Portable Maven installed at $MVN_DIR"
   else
     ok "Using existing portable Maven at $MVN_DIR"
@@ -128,6 +147,8 @@ ensure_maven() {
 
 ensure_project() {
   [ -f pom.xml ] || die "pom.xml not found. Run this script from the project root."
+
+  tr -d '\r' < pom.xml > pom.xml.tmp && mv pom.xml.tmp pom.xml
 
   if ! grep -q "spring-boot-starter-test" pom.xml; then
     say "pom.xml has no spring-boot-starter-test - adding it."
