@@ -1,12 +1,12 @@
 @echo off
 REM ============================================================================
-REM  test.bat - Windows, 1 FILE DUY NHAT (ben trong co chua san code PowerShell)
-REM  Double-click de chay, hoac chay trong terminal kem tham so.
+REM  test.bat - Windows, ONE FILE ONLY (the PowerShell code is embedded inside)
+REM  Double-click to run the autotest (mvn test). Installs nothing.
 REM ============================================================================
 setlocal
 set "PROJECT_ROOT=%~dp0"
 set "TMPPS=%TEMP%\fcm_test_%RANDOM%.ps1"
-REM Tach phan PowerShell (tu dong danh dau BEGIN tro xuong) ra file tam
+REM Extract the embedded PowerShell part (everything below the PS-BEGIN marker line) into a temp file
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=Get-Content -LiteralPath '%~f0' -Raw; $i=$t.IndexOf('#'+'#PS-BEGIN'); Set-Content -LiteralPath '%TMPPS%' -Value $t.Substring($i) -Encoding UTF8"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%TMPPS%" %*
 set EXITCODE=%ERRORLEVEL%
@@ -17,16 +17,16 @@ exit /b %EXITCODE%
 
 ##PS-BEGIN
 # =============================================================================
-#  test.ps1  -  Windows (PowerShell 5.1+ / PowerShell 7)
-#  CHI CHAY AUTOTEST (mvn test). Khong cai dat gi ca.
-#  Neu chua co JDK/Maven -> bao ban chay setup.bat truoc.
+#  Embedded PowerShell part of test.bat (Windows PowerShell 5.1+ / PowerShell 7)
+#  ONLY RUNS THE AUTOTEST (mvn test). Installs nothing.
+#  If JDK/Maven is missing, it tells you to run setup.bat first.
 #
-#  Dung (khuyen nghi: double-click test.bat), hoac:
-#    .\test.ps1                              # chay toan bo test
-#    .\test.ps1 -Dtest=FcmFlowTest test      # chi chay file FcmFlowTest
+#  Usage (recommended: double-click test.bat), or from a terminal:
+#    .\test.bat                              # run all tests
+#    .\test.bat -Dtest=FcmFlowTest test      # run only the FcmFlowTest class
 # =============================================================================
 $ErrorActionPreference = 'Stop'
-# Lam moi PATH tu he thong (terminal mo truoc khi cai Java/Maven se bi giu PATH cu)
+# Refresh PATH from the system settings (a terminal opened before Java/Maven was installed keeps an old PATH) 
 try {
     $machinePath = [Environment]::ExpandEnvironmentVariables([Environment]::GetEnvironmentVariable('Path', 'Machine'))
     $userPath    = [Environment]::ExpandEnvironmentVariables([Environment]::GetEnvironmentVariable('Path', 'User'))
@@ -36,7 +36,7 @@ $Root = $env:PROJECT_ROOT.TrimEnd('\')
 Set-Location -LiteralPath $Root
 $Tools    = Join-Path $Root '.tools'
 $MinJava  = 17
-$MaxJava = 21
+$MaxJava  = 21
 $TestFile = 'src\test\java\com\seminar\fcm\FcmFlowTest.java'
 
 function Say($m)  { Write-Host "[test ] $m" -ForegroundColor Cyan }
@@ -62,52 +62,52 @@ function Use-Jdk {
     $javac = Get-Command javac -ErrorAction SilentlyContinue
     if ($java -and $javac) {
         $v = Get-JavaMajor $java.Source
-        if ($v -ge $MinJava -and $v -le $MaxJava) { Ok "Dung JDK $v cua he thong."; return }
+        if ($v -ge $MinJava -and $v -le $MaxJava) { Ok "Use JDK $v of system."; return }
     }
     $jdk = Join-Path $Tools 'jdk'
     if (Test-Path (Join-Path $jdk 'bin\javac.exe')) {
         $env:JAVA_HOME = $jdk
         $env:PATH      = (Join-Path $jdk 'bin') + ';' + $env:PATH
-        Ok "Dung JDK portable: $jdk"; return
+        Ok "Use portable JDK: $jdk"; return
     }
-    Die "Chua co JDK $MinJava-$MaxJava phu hop. Hay chay truoc: setup.bat"
+    Die "No suitable JDK $MinJava-$MaxJava found. Please run:  setup.bat"
 }
 
 function Use-Maven {
-    if (Get-Command mvn -ErrorAction SilentlyContinue) { Ok "Dung Maven cua he thong."; return }
+    if (Get-Command mvn -ErrorAction SilentlyContinue) { Ok "Use Maven of system."; return }
     $mvn = Join-Path $Tools 'maven'
     if (Test-Path (Join-Path $mvn 'bin\mvn.cmd')) {
         $env:PATH = (Join-Path $mvn 'bin') + ';' + $env:PATH
-        Ok "Dung Maven portable: $mvn"; return
+        Ok "Use portable Maven: $mvn"; return
     }
-    Die "Chua co Maven. Hay chay truoc: setup.bat"
+    Die "No Maven found. Please run:  setup.bat"
 }
 
-if (-not (Test-Path 'pom.xml')) { Die "Khong thay pom.xml. Hay chay script o thu muc goc cua project." }
+if (-not (Test-Path 'pom.xml')) { Die "No pom.xml found. Please run this script in the root directory of the project." }
 Use-Jdk
 Use-Maven
 
 if (-not ([IO.File]::ReadAllText((Join-Path $Root 'pom.xml')) -match 'spring-boot-starter-test')) {
-    Die "pom.xml chua co spring-boot-starter-test. Chay setup.bat (tu them) hoac them tay dependency nay."
+    Die "pom.xml does not contain spring-boot-starter-test. Run setup.bat (auto-add) or manually add this dependency."
 }
-if (-not (Test-Path $TestFile)) { Die "Chua thay $TestFile. Hay chep FcmFlowTest.java vao dung duong dan do." }
+if (-not (Test-Path $TestFile)) { Die "No $TestFile found. Please copy FcmFlowTest.java to the correct path." }
 
 Write-Host ''
-# @(...) bat buoc: neu khong PowerShell se bien mang 1 phan tu thanh chuoi va tach tung ky tu
+# @(...) is required: otherwise PowerShell unwraps a one-element array into a string and mvn receives it split into single characters
 $mvnArgs = @(if ($args.Count -eq 0) { 'test' } else { $args })
 $eapOld = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
 $jv = (& java -version 2>&1 | Select-Object -First 1)
 $ErrorActionPreference = $eapOld
-Say "JDK dang dung: $jv"
-Say ("Chay: mvn -B " + ($mvnArgs -join ' '))
+Say "JDK currently in use: $jv"
+Say ("Run: mvn -B " + ($mvnArgs -join ' '))
 & mvn -B @mvnArgs
 $code = $LASTEXITCODE
 
 Write-Host ''
-if ($code -eq 0) { Ok 'TAT CA TEST PASS.' }
+if ($code -eq 0) { Ok 'ALL TESTS PASSED.' }
 else {
-    Warn "Co test loi (exit $code). Xem chi tiet: target\surefire-reports\com.seminar.fcm.FcmFlowTest.txt"
-    Say "Nguyen nhan goc (cac dong 'Caused by' dau tien):"
+    Warn "Some tests failed (exit $code). See details: target\surefire-reports\com.seminar.fcm.FcmFlowTest.txt"
+    Say "Root cause (first 'Caused by' lines):"
     $causes = Get-ChildItem 'target\surefire-reports\*.txt' -ErrorAction SilentlyContinue |
         Select-String -Pattern 'Caused by' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique -First 6
     foreach ($c in $causes) { Write-Host ("  " + $c) }
