@@ -33,6 +33,15 @@ java_major() {
   esac
 }
 
+locate_jdk_home() {
+  local target_dir="$1"
+  local javac_bin
+  javac_bin="$(find "$target_dir" -type f -name javac 2>/dev/null | head -1)"
+  if [ -n "$javac_bin" ]; then
+    dirname "$(dirname "$javac_bin")"
+  fi
+}
+
 # ---------------------------------------------------------------- locate a suitable JDK (17-21)
 use_jdk() {
   if command -v java >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; then
@@ -40,12 +49,19 @@ use_jdk() {
     if [ "${v:-0}" -ge "$MIN_JAVA" ] && [ "${v:-0}" -le "$MAX_JAVA" ]; then ok "Use JDK $v of system."; return; fi
     warn "JDK system is version $v (need $MIN_JAVA-$MAX_JAVA) -> skipping, looking for portable JDK."
   fi
-  for cand in "$TOOLS/jdk/Contents/Home" "$TOOLS/jdk"; do
-    if [ -x "$cand/bin/javac" ]; then
-      export JAVA_HOME="$cand"; export PATH="$JAVA_HOME/bin:$PATH"
-      ok "Use portable JDK: $cand"; return
-    fi
-  done
+
+  local home=""
+  if [ -d "$TOOLS/jdk" ]; then
+    home="$(locate_jdk_home "$TOOLS/jdk")"
+  fi
+
+  if [ -n "$home" ] && [ -x "$home/bin/javac" ]; then
+    export JAVA_HOME="$home"
+    export PATH="$JAVA_HOME/bin:$PATH"
+    ok "Use portable JDK: $home"
+    return
+  fi
+
   die "No suitable JDK $MIN_JAVA-$MAX_JAVA found. Please run:  ./setup.sh"
 }
 
