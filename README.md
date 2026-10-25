@@ -10,10 +10,11 @@ Project có trang web demo, REST API, database H2 lưu token và 19 test method 
 
 ## Yêu cầu
 
-- **Windows x64** để dùng `start.bat`: script có thể tải JDK và Maven portable khi máy chưa có công cụ phù hợp.
+- **Windows x64, macOS hoặc Linux**. Chọn `start.bat` trên Windows và `start.sh` trên macOS/Linux.
+- **Java JDK 17–21** và Maven tương thích. Các script setup sẽ kiểm tra công cụ có sẵn và chỉ chuẩn bị công cụ portable khi cần.
 - Trình duyệt **Chrome hoặc Edge** ở cửa sổ thường, cho phép thông báo.
 - Tài khoản và project **Firebase** tại https://console.firebase.google.com.
-- Kết nối Internet để tải thư viện và gửi/nhận thông báo.
+- Kết nối Internet để tải công cụ, thư viện và gửi/nhận thông báo.
 
 Nếu chạy thủ công hoặc dùng macOS/Linux, chuẩn bị **JDK 17** và **Maven** trong PATH.
 
@@ -23,7 +24,7 @@ Nếu chạy thủ công hoặc dùng macOS/Linux, chuẩn bị **JDK 17** và *
 
 Trên trang GitHub của project này, chọn **Code → Download ZIP**, rồi giải nén. Nếu dùng Git, chọn **Code → HTTPS**, sao chép URL của repository để clone.
 
-Mở thư mục vừa tải. Thư mục gốc phải có `pom.xml`, `start.bat` và `src`. Thực hiện các lệnh trong tài liệu tại thư mục này.
+Mở thư mục vừa tải. Thư mục gốc phải có pom.xml, start.bat, start.sh, setup.bat, setup.sh, test.bat, test.sh và thư mục src. Thực hiện các lệnh trong tài liệu tại thư mục này.
 
 ### 2. Chuẩn bị Firebase project và khóa server
 
@@ -82,6 +83,32 @@ Lần đầu có thể mất vài phút do tải JDK/Maven hoặc dependencies. 
 
 > Nếu cổng 8080 đã bận, script có thể mở trang của tiến trình đang chạy rồi thoát. Sau khi sửa source, dừng backend cũ trước khi chạy lại để tránh xem nhầm phiên cũ.
 
+**macOS / Linux:**
+
+Mở Terminal tại thư mục gốc của project và chạy:
+
+```bash
+chmod +x start.sh setup.sh test.sh
+./start.sh
+```
+
+Script sẽ kiểm tra môi trường và cấu hình cần thiết trước khi khởi động ứng dụng. Nếu máy chưa có JDK hoặc Maven tương thích, script setup có thể tải công cụ portable vào thư mục `.tools/`.
+
+Trước khi chạy, hãy hoàn tất các bước cấu hình Firebase ở mục 2 và mục 3. Nếu script báo thiếu file cấu hình hoặc yêu cầu bổ sung thông tin, hãy làm theo hướng dẫn trên Terminal.
+
+Chờ Spring Boot khởi động. Nếu trình duyệt không tự mở, truy cập:
+
+http://localhost:8080
+
+Để chạy kiểm thử trước khi khởi động ứng dụng, dùng:
+
+```bash
+./test.sh
+```
+
+Để dừng ứng dụng, nhấn `Ctrl+C` trong Terminal đang chạy backend.
+
+
 ### 5. Sử dụng
 
 | Việc | Thao tác |
@@ -118,22 +145,43 @@ Truy cập http://localhost:8080. Vẫn cần chuẩn bị hai file cấu hình 
 
 Source có `setup.bat` và `setup.sh` để chuẩn bị môi trường. `setup.sh` không tự cấu hình Firebase hoặc khởi động ứng dụng. Nếu dùng công cụ portable trên macOS/Linux, kiểm tra lại PATH/JAVA_HOME của terminal trước khi chạy Maven; thay đổi biến môi trường trong script không tự áp dụng cho shell cha.
 
-## Chạy test
+## Chạy kiểm thử
 
-Tại thư mục chứa `pom.xml`:
+Mở Terminal hoặc PowerShell tại thư mục gốc của project (thư mục chứa file `pom.xml`).
+
+**Cách 1: Chạy test bằng script có sẵn**
+
+Trên Windows, chạy:
 
 ```powershell
-# Windows
 .\test.bat
 ```
 
-Hoặc dùng Maven trực tiếp khi môi trường đã sẵn sàng:
+Trên macOS/Linux, chạy:
+
+```bash
+./test.sh
+```
+
+Nếu macOS/Linux báo không có quyền thực thi script, chạy lệnh sau trước:
+
+```bash
+chmod +x test.sh
+```
+
+**Cách 2: Chạy test trực tiếp bằng Maven**
+
+Nếu máy đã có JDK tương thích và Maven, chạy:
 
 ```bash
 mvn test
 ```
 
-Firebase được mock trong `FcmFlowTest`, nên test không gửi thông báo thật và không cần service account cho các lời gọi Firebase giả lập. Xem kết quả thực tế trong terminal; chỉ kết luận test đạt khi không có failure/error và build thành công.
+**Kết quả kiểm thử**
+
+Các bài kiểm thử trong `FcmFlowTest` sử dụng Firebase giả lập (mock), nên không gửi thông báo Firebase thật và không cần file service account cho những lời gọi Firebase được giả lập.
+
+Theo dõi kết quả trong Terminal. Chỉ xác nhận kiểm thử thành công khi Maven kết thúc với trạng thái `BUILD SUCCESS` và không có bài kiểm thử nào thất bại hoặc phát sinh lỗi.
 
 ## API chính
 
@@ -190,6 +238,7 @@ Trạng thái hỗ trợ: `CONFIRMED`, `SHIPPING`, `DELIVERED`, `CANCELLED`.
 |---|---|
 | `pom.xml` | Dependencies và cấu hình build Maven |
 | `start.bat` | Kiểm tra cấu hình, chuẩn bị công cụ nếu thiếu và chạy demo trên Windows |
+| `start.sh` | Kiểm tra cấu hình, chuẩn bị công cụ nếu thiếu và chạy demo trên macOS/Linux |
 | `setup.bat`, `setup.sh` | Chuẩn bị môi trường |
 | `test.bat`, `test.sh` | Chạy kiểm thử |
 | `firebase-service-account.json` | Khóa server local, không commit |
