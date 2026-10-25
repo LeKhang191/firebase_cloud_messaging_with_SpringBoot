@@ -97,17 +97,43 @@ function Open-Browser([string]$url) {
 }
 
 function Ensure-Jdk {
-    $java  = Get-Command java  -ErrorAction SilentlyContinue
-    $javac = Get-Command javac -ErrorAction SilentlyContinue
-    if ($java -and $javac) {
-        $v = Get-JavaMajor $java.Source
-        if ($v -ge $MinJava) {
-            Ok "JDK $v found on this machine - skipping install."
-            if (-not $env:JAVA_HOME) { $env:JAVA_HOME = (Get-Item -LiteralPath $javac.Source).Directory.Parent.FullName }
-            return
+    # JAVA_HOME may be stale even when java in PATH works.
+    # Ask the running JVM for its actual home, avoiding PATH shims.
+    $candidates = @()
+    $java = Get-Command java -CommandType Application -ErrorAction SilentlyContinue
+    if ($java) {
+        $old = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            $settings = (& $java.Source -XshowSettings:properties -version 2>&1 | Out-String)
+            if ($settings -match '(?m)^\s*java\.home\s*=\s*(.+?)\s*$') {
+                $candidates += $Matches[1].Trim()
+            }
+        } catch {
+        } finally {
+            $ErrorActionPreference = $old
         }
-        Warn "JDK on this machine is version $v (< $MinJava) - using a portable JDK."
     }
+    if ($env:JAVA_HOME) { $candidates += $env:JAVA_HOME.Trim().Trim('"') }
+    $javac = Get-Command javac -CommandType Application -ErrorAction SilentlyContinue
+    if ($javac) { $candidates += (Get-Item -LiteralPath $javac.Source).Directory.Parent.FullName }
+
+    foreach ($candidate in ($candidates | Select-Object -Unique)) {
+        $javaExe = Join-Path $candidate 'bin\java.exe'
+        $javacExe = Join-Path $candidate 'bin\javac.exe'
+        if ((Test-Path -LiteralPath $javaExe -PathType Leaf) -and
+            (Test-Path -LiteralPath $javacExe -PathType Leaf)) {
+            $v = Get-JavaMajor $javaExe
+            if ($v -ge $MinJava) {
+                # Always replace JAVA_HOME and put the SAME JDK first in PATH.
+                $env:JAVA_HOME = $candidate
+                $env:PATH = (Join-Path $candidate 'bin') + ';' + $env:PATH
+                Ok "JDK $v found - JAVA_HOME set to $candidate"
+                return
+            }
+        }
+    }
+    Warn "No valid JDK $MinJava or newer found - using a portable JDK."
     if (-not (Test-Path (Join-Path $JdkDir 'bin\javac.exe'))) {
         Say "Downloading JDK $JdkVersion (Temurin, windows/x64) ..."
         New-Item -ItemType Directory -Force -Path $Tools | Out-Null
