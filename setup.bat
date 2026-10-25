@@ -1,5 +1,5 @@
 @echo off
-REM setup.bat - installs the environment only (JDK 17+ and Maven). Double-click to run.
+REM setup.bat - installs the environment only (JDK 17-21 and Maven). Double-click to run.
 setlocal
 set "PROJECT_ROOT=%~dp0"
 set "TMPPS=%TEMP%\fcm_setup_%RANDOM%.ps1"
@@ -27,6 +27,7 @@ $Tools        = Join-Path $Root '.tools'
 $JdkDir       = Join-Path $Tools 'jdk'
 $MvnDir       = Join-Path $Tools 'maven'
 $MinJava      = 17
+$MaxJava      = 21
 $JdkVersion   = 17
 $MavenVersion = '3.9.9'
 $TestFile     = 'src\test\java\com\seminar\fcm\FcmFlowTest.java'
@@ -78,8 +79,8 @@ function Ensure-Jdk {
     $javac = Get-Command javac -ErrorAction SilentlyContinue
     if ($java -and $javac) {
         $v = Get-JavaMajor $java.Source
-        if ($v -ge $MinJava) { Ok "JDK $v found on this machine - skipping install."; return }
-        Warn "JDK on this machine is version $v (< $MinJava) - using a portable JDK."
+        if ($v -ge $MinJava -and $v -le $MaxJava) { Ok "JDK $v found on this machine - skipping install."; return }
+        Warn "JDK on this machine is version $v (need $MinJava-$MaxJava) - using a portable JDK $JdkVersion."
     }
     if (-not (Test-Path (Join-Path $JdkDir 'bin\javac.exe'))) {
         Say "Downloading JDK $JdkVersion (Temurin, windows/x64) ..."

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup.sh - macOS / Linux. Installs the environment only (JDK 17+ and Maven).
+# setup.sh - macOS / Linux. Installs the environment only (JDK 17-21 and Maven).
 # Tools already on the machine are reused; missing ones are downloaded to ./.tools (no sudo).
 set -euo pipefail
 
@@ -9,6 +9,7 @@ TOOLS="$ROOT/.tools"
 JDK_DIR="$TOOLS/jdk"
 MVN_DIR="$TOOLS/maven"
 MIN_JAVA=17
+MAX_JAVA=21   # Spring Boot 3.3.x + Mockito are not reliable on JDK newer than 21
 JDK_VERSION=17
 MAVEN_VERSION="3.9.9"
 TEST_FILE="src/test/java/com/seminar/fcm/FcmFlowTest.java"
@@ -66,11 +67,11 @@ esac
 ensure_jdk() {
   if command -v java >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; then
     local v; v="$(java_major "$(command -v java)")"
-    if [ "${v:-0}" -ge "$MIN_JAVA" ]; then
+    if [ "${v:-0}" -ge "$MIN_JAVA" ] && [ "${v:-0}" -le "$MAX_JAVA" ]; then
       ok "JDK $v found on this machine - skipping install."
       return
     fi
-    warn "JDK on this machine is version $v (< $MIN_JAVA) - using a portable JDK."
+    warn "JDK on this machine is version $v (need $MIN_JAVA-$MAX_JAVA) - using a portable JDK $JDK_VERSION."
   fi
 
   local home=""
