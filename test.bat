@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 REM ============================================================================
 REM  test.bat - Windows, ONE FILE ONLY (the PowerShell code is embedded inside)
 REM  Double-click to run the autotest (mvn test). Installs nothing.
@@ -57,32 +57,91 @@ function Get-JavaMajor([string]$javaExe) {
     return 0
 }
 
+function Get-JavacMajor([string]$javacExe) {
+    $old = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { $out = (& $javacExe -version 2>&1 | Out-String) } catch { $out = '' }
+    $ErrorActionPreference = $old
+    if ($out -match 'javac\s+(\d+)(?:\.(\d+))?') {
+        $major = [int]$Matches[1]
+        if ($major -eq 1 -and $Matches[2]) { $major = [int]$Matches[2] }
+        return $major
+    }
+    return 0
+}
+
 function Use-Jdk {
-    $java  = Get-Command java  -ErrorAction SilentlyContinue
-    $javac = Get-Command javac -ErrorAction SilentlyContinue
-    if ($java -and $javac) {
-        $v = Get-JavaMajor $java.Source
-        if ($v -ge $MinJava -and $v -le $MaxJava) { Ok "Use JDK $v of system."; return }
+    if ($env:FCM_FORCE_PORTABLE_TOOLS -ne '1') {
+        $java  = Get-Command java  -ErrorAction SilentlyContinue
+        $javac = Get-Command javac -ErrorAction SilentlyContinue
+        if ($java -and $javac) {
+            $v = Get-JavaMajor $java.Source
+            $cv = Get-JavacMajor $javac.Source
+            if ($v -ge $MinJava -and $v -le $MaxJava -and $v -eq $cv) {
+                $home = $null
+                if ($env:JAVA_HOME -and (Test-Path (Join-Path $env:JAVA_HOME 'bin\javac.exe'))) {
+                    $home = $env:JAVA_HOME.Trim().Trim('"')
+                } else {
+                    $home = (Get-Item -LiteralPath $javac.Source).Directory.Parent.FullName
+                }
+                if ($home -and (Test-Path (Join-Path $home 'bin\java.exe'))) {
+                    $env:JAVA_HOME = $home
+                    $env:PATH = (Join-Path $home 'bin') + ';' + $env:PATH
+                }
+                Ok "Use system JDK $v."
+                return
+            }
+        }
     }
     $jdk = Join-Path $Tools 'jdk'
-    if (Test-Path (Join-Path $jdk 'bin\javac.exe')) {
-        $env:JAVA_HOME = $jdk
-        $env:PATH      = (Join-Path $jdk 'bin') + ';' + $env:PATH
-        Ok "Use portable JDK: $jdk"; return
+    $javaExe = Join-Path $jdk 'bin\java.exe'
+    $javacExe = Join-Path $jdk 'bin\javac.exe'
+    if ((Test-Path $javaExe) -and (Test-Path $javacExe)) {
+        $v = Get-JavaMajor $javaExe
+        if ($v -ge $MinJava -and $v -le $MaxJava) {
+            $env:JAVA_HOME = $jdk
+            $env:PATH = (Join-Path $jdk 'bin') + ';' + $env:PATH
+            Ok "Use portable JDK ${v}: $jdk"
+            return
+        }
     }
-    Die "No suitable JDK $MinJava-$MaxJava found. Please run:  setup.bat"
+    Die "No suitable JDK $MinJava-$MaxJava found. Please run setup.bat"
+}
+function Test-MavenCompatible([string]$version) {
+    if ($version -notmatch '^(\d+)\.(\d+)\.(\d+)') { return $false }
+    $major = [int]$Matches[1]; $minor = [int]$Matches[2]; $patch = [int]$Matches[3]
+    return ($major -gt 3 -or ($major -eq 3 -and ($minor -gt 6 -or ($minor -eq 6 -and $patch -ge 3))))
+}
+
+function Get-MavenVersion([string]$mvnExe) {
+    $old = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { $out = (& $mvnExe -v 2>&1 | Out-String) } catch { $out = '' }
+    $ErrorActionPreference = $old
+    if ($out -match 'Apache Maven\s+(\d+\.\d+\.\d+)') { return $Matches[1] }
+    return ''
 }
 
 function Use-Maven {
-    if (Get-Command mvn -ErrorAction SilentlyContinue) { Ok "Use Maven of system."; return }
-    $mvn = Join-Path $Tools 'maven'
-    if (Test-Path (Join-Path $mvn 'bin\mvn.cmd')) {
-        $env:PATH = (Join-Path $mvn 'bin') + ';' + $env:PATH
-        Ok "Use portable Maven: $mvn"; return
+    if ($env:FCM_FORCE_PORTABLE_TOOLS -ne '1') {
+        $mvn = Get-Command mvn -ErrorAction SilentlyContinue
+        if ($mvn) {
+            $version = Get-MavenVersion $mvn.Source
+            if (Test-MavenCompatible $version) { Ok "Use system Maven $version."; return }
+            Warn "System Maven version '$version' is missing or too old."
+        }
     }
-    Die "No Maven found. Please run:  setup.bat"
+    $mvnCmd = Join-Path $Tools 'maven\bin\mvn.cmd'
+    if (Test-Path $mvnCmd) {
+        $version = Get-MavenVersion $mvnCmd
+        if (Test-MavenCompatible $version) {
+            $env:PATH = (Join-Path $Tools 'maven\bin') + ';' + $env:PATH
+            Ok "Use portable Maven $version."
+            return
+        }
+    }
+    Die "No compatible Maven found. Please run setup.bat"
 }
-
 if (-not (Test-Path 'pom.xml')) { Die "No pom.xml found. Please run this script in the root directory of the project." }
 Use-Jdk
 Use-Maven

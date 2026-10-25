@@ -53,6 +53,13 @@ java_major() {
   esac
 }
 
+javac_major() {
+  local out
+  out="$("$1" -version 2>&1 | awk 'NR==1 {for (i=1; i<=NF; i++) if ($i ~ /^[0-9]+([.][0-9]+)*/) {print $i; exit}}')" || true
+  [ -z "$out" ] && { echo 0; return; }
+  echo "$out" | cut -d. -f1 | sed 's/[^0-9].*//'
+}
+
 case "$(uname -s)" in
   Linux*)  ADOPT_OS="linux"; [ -f /etc/alpine-release ] && ADOPT_OS="alpine-linux" ;;
   Darwin*) ADOPT_OS="mac" ;;
@@ -76,12 +83,24 @@ locate_jdk_home() {
 
 ensure_jdk() {
   if [ "${FCM_FORCE_PORTABLE_TOOLS:-0}" != "1" ] && command -v java >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; then
-    local v; v="$(java_major "$(command -v java)")"
-    if [ "${v:-0}" -ge "$MIN_JAVA" ] && [ "${v:-0}" -le "$MAX_JAVA" ]; then
-      ok "JDK $v found on this machine - skipping install."
+    local java_v javac_v home javac_path
+    java_v="$(java_major "$(command -v java)")"
+    javac_v="$(javac_major "$(command -v javac)")"
+    if [ "${java_v:-0}" -ge "$MIN_JAVA" ] && [ "${java_v:-0}" -le "$MAX_JAVA" ] && [ "$java_v" = "$javac_v" ]; then
+      if [ "$ADOPT_OS" = "mac" ] && [ -x /usr/libexec/java_home ]; then
+        home="$(/usr/libexec/java_home -v "$java_v" 2>/dev/null || true)"
+      else
+        javac_path="$(readlink -f "$(command -v javac)" 2>/dev/null || command -v javac)"
+        home="$(dirname "$(dirname "$javac_path")")"
+      fi
+      if [ -n "${home:-}" ] && [ -x "$home/bin/java" ] && [ -x "$home/bin/javac" ]; then
+        export JAVA_HOME="$home"
+        export PATH="$JAVA_HOME/bin:$PATH"
+      fi
+      ok "JDK $java_v found on this machine - skipping JDK download."
       return
     fi
-    warn "JDK on this machine is version $v (need $MIN_JAVA-$MAX_JAVA) - using portable JDK $JDK_VERSION."
+    warn "System Java/JDK is missing, mismatched, or outside versions $MIN_JAVA-$MAX_JAVA; checking portable JDK."
   fi
 
   local home=""
@@ -89,7 +108,7 @@ ensure_jdk() {
     home="$(locate_jdk_home "$JDK_DIR")"
   fi
 
-  if [ -z "$home" ]; then
+  if [ -z "$home" ] || [ ! -x "$home/bin/java" ] || [ ! -x "$home/bin/javac" ]; then
     need_cmd tar
     say "Downloading JDK $JDK_VERSION (Temurin, $ADOPT_OS/$ADOPT_ARCH) ..."
     mkdir -p "$TOOLS"
@@ -100,25 +119,44 @@ ensure_jdk() {
     rm -f "$archive"
 
     home="$(locate_jdk_home "$JDK_DIR")"
-    [ -n "$home" ] || die "JDK extracted but bin/javac was not found."
+    [ -n "$home" ] && [ -x "$home/bin/java" ] && [ -x "$home/bin/javac" ] || die "JDK extracted but java/javac were not found."
 
     if [ "$ADOPT_OS" = "mac" ] && command -v xattr >/dev/null 2>&1; then
       xattr -dr com.apple.quarantine "$JDK_DIR" 2>/dev/null || true
     fi
-
     ok "Portable JDK installed at $home"
   else
     ok "Using existing portable JDK at $home"
   fi
 
+  local portable_v
+  portable_v="$(java_major "$home/bin/java")"
+  [ "${portable_v:-0}" -ge "$MIN_JAVA" ] && [ "${portable_v:-0}" -le "$MAX_JAVA" ] || die "Portable JDK version must be $MIN_JAVA-$MAX_JAVA; found $portable_v."
   export JAVA_HOME="$home"
   export PATH="$JAVA_HOME/bin:$PATH"
 }
 
+maven_major_minor_patch() {
+  "$1" -v 2>&1 | awk '/Apache Maven/ {print $3; exit}'
+}
+
+maven_is_compatible() {
+  local version="$1" major minor patch
+  [[ "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]] || return 1
+  major="${BASH_REMATCH[1]}"; minor="${BASH_REMATCH[2]}"; patch="${BASH_REMATCH[3]}"
+  [ "$major" -gt 3 ] || { [ "$major" -eq 3 ] && { [ "$minor" -gt 6 ] || { [ "$minor" -eq 6 ] && [ "$patch" -ge 3 ]; }; }; }
+}
+
 ensure_maven() {
+  local system_mvn="" version=""
   if [ "${FCM_FORCE_PORTABLE_TOOLS:-0}" != "1" ] && command -v mvn >/dev/null 2>&1; then
-    ok "Maven found on this machine - skipping install."
-    return
+    system_mvn="$(command -v mvn)"
+    version="$(maven_major_minor_patch "$system_mvn" || true)"
+    if maven_is_compatible "$version"; then
+      ok "Maven $version found on this machine - skipping Maven download."
+      return
+    fi
+    warn "System Maven version '${version:-unknown}' is missing or too old; checking portable Maven."
   fi
   if [ ! -x "$MVN_DIR/bin/mvn" ]; then
     need_cmd tar
@@ -133,15 +171,13 @@ ensure_maven() {
     rm -rf "$MVN_DIR"; mkdir -p "$MVN_DIR"
     tar -xzf "$archive" -C "$MVN_DIR" --strip-components=1
     rm -f "$archive"
-
     if [ "$ADOPT_OS" = "mac" ] && command -v xattr >/dev/null 2>&1; then
       xattr -dr com.apple.quarantine "$MVN_DIR" 2>/dev/null || true
     fi
-
     ok "Portable Maven installed at $MVN_DIR"
-  else
-    ok "Using existing portable Maven at $MVN_DIR"
   fi
+  version="$(maven_major_minor_patch "$MVN_DIR/bin/mvn" || true)"
+  maven_is_compatible "$version" || die "Portable Maven is too old or invalid (found '${version:-unknown}'; need Maven 3.6.3 or newer)."
   export PATH="$MVN_DIR/bin:$PATH"
 }
 

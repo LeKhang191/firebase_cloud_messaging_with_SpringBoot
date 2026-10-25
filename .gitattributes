@@ -1,2 +1,13 @@
-*.sh  text eol=lf
+# Use LF for shell scripts on macOS and Linux.
+*.sh text eol=lf
+
+# Use CRLF for Windows batch scripts.
 *.bat text eol=crlf
+
+# Normalize common text files.
+*.yml text eol=lf
+*.yaml text eol=lf
+*.java text eol=lf
+*.xml text eol=lf
+*.properties text eol=lf
+*.md text eol=lf
