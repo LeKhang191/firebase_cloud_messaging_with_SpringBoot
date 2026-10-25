@@ -13,6 +13,7 @@ TOOLS="$ROOT/.tools"
 JDK_DIR="$TOOLS/jdk"
 MVN_DIR="$TOOLS/maven"
 MIN_JAVA=17
+MAX_JAVA=21   # Spring Boot 3.3.x + Mockito chưa chạy ổn trên JDK mới hơn 21
 JDK_VERSION=17
 MAVEN_VERSION="3.9.9"
 TEST_FILE="src/test/java/com/seminar/fcm/FcmFlowTest.java"
@@ -74,11 +75,11 @@ ensure_jdk() {
   # a) JDK có sẵn trên máy (cần cả java lẫn javac)
   if command -v java >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; then
     local v; v="$(java_major "$(command -v java)")"
-    if [ "${v:-0}" -ge "$MIN_JAVA" ]; then
+    if [ "${v:-0}" -ge "$MIN_JAVA" ] && [ "${v:-0}" -le "$MAX_JAVA" ]; then
       ok "Đã có JDK $v trên máy -> bỏ qua cài đặt."
       return
     fi
-    warn "JDK trên máy là bản $v (< $MIN_JAVA) -> sẽ dùng bản portable."
+    warn "JDK trên máy là bản $v (cần $MIN_JAVA-$MAX_JAVA) -> sẽ dùng bản portable JDK $JDK_VERSION."
   fi
 
   # b) JDK portable đã tải trước đó

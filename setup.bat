@@ -39,6 +39,7 @@ $Tools        = Join-Path $Root '.tools'
 $JdkDir       = Join-Path $Tools 'jdk'
 $MvnDir       = Join-Path $Tools 'maven'
 $MinJava      = 17
+$MaxJava = 21
 $JdkVersion   = 17
 $MavenVersion = '3.9.9'
 $TestFile     = 'src\test\java\com\seminar\fcm\FcmFlowTest.java'
@@ -93,8 +94,8 @@ function Ensure-Jdk {
     $javac = Get-Command javac -ErrorAction SilentlyContinue
     if ($java -and $javac) {
         $v = Get-JavaMajor $java.Source
-        if ($v -ge $MinJava) { Ok "Da co JDK $v tren may -> bo qua cai dat."; return }
-        Warn "JDK tren may la ban $v (< $MinJava) -> se dung ban portable."
+        if ($v -ge $MinJava -and $v -le $MaxJava) { Ok "Da co JDK $v tren may -> bo qua cai dat."; return }
+        Warn "JDK tren may la ban $v (can $MinJava-$MaxJava) -> se dung ban portable."
     }
 
     if (-not (Test-Path (Join-Path $JdkDir 'bin\javac.exe'))) {

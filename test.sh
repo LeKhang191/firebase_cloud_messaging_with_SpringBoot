@@ -15,6 +15,7 @@ cd "$(dirname "$0")"
 ROOT="$(pwd)"
 TOOLS="$ROOT/.tools"
 MIN_JAVA=17
+MAX_JAVA=21
 TEST_FILE="src/test/java/com/seminar/fcm/FcmFlowTest.java"
 
 say()  { printf '\033[1;36m[test ]\033[0m %s\n' "$*"; }
@@ -36,7 +37,8 @@ java_major() {
 use_jdk() {
   if command -v java >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; then
     local v; v="$(java_major "$(command -v java)")"
-    if [ "${v:-0}" -ge "$MIN_JAVA" ]; then ok "Dùng JDK $v của hệ thống."; return; fi
+    if [ "${v:-0}" -ge "$MIN_JAVA" ] && [ "${v:-0}" -le "$MAX_JAVA" ]; then ok "Dùng JDK $v của hệ thống."; return; fi
+    warn "JDK hệ thống là bản $v (cần $MIN_JAVA-$MAX_JAVA) -> bỏ qua, tìm JDK portable."
   fi
   for cand in "$TOOLS/jdk/Contents/Home" "$TOOLS/jdk"; do
     if [ -x "$cand/bin/javac" ]; then
@@ -44,7 +46,7 @@ use_jdk() {
       ok "Dùng JDK portable: $cand"; return
     fi
   done
-  die "Chưa có JDK $MIN_JAVA+. Hãy chạy trước:  ./setup.sh"
+  die "Chưa có JDK $MIN_JAVA-$MAX_JAVA phù hợp. Hãy chạy trước:  ./setup.sh"
 }
 
 # ---------------------------------------------------------------- tìm Maven
@@ -68,6 +70,7 @@ grep -q "spring-boot-starter-test" pom.xml \
 
 echo
 if [ "$#" -eq 0 ]; then set -- test; fi
+say "JDK đang dùng: $(java -version 2>&1 | head -1)"
 say "Chạy: mvn -B $*"
 set +e
 mvn -B "$@"
@@ -79,5 +82,10 @@ if [ "$code" -eq 0 ]; then
   ok "TẤT CẢ TEST PASS."
 else
   warn "Có test lỗi (exit $code). Xem chi tiết: target/surefire-reports/com.seminar.fcm.FcmFlowTest.txt"
+  echo
+  say "JDK đã dùng: $(java -version 2>&1 | head -1)"
+  say "Nguyên nhân gốc (các dòng 'Caused by' đầu tiên):"
+  { grep -h "Caused by" target/surefire-reports/*.txt 2>/dev/null | awk '!seen[$0]++' | head -6 | cut -c1-400; } || true
+  echo
 fi
 exit "$code"

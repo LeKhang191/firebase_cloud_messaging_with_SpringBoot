@@ -36,6 +36,7 @@ $Root = $env:PROJECT_ROOT.TrimEnd('\')
 Set-Location -LiteralPath $Root
 $Tools    = Join-Path $Root '.tools'
 $MinJava  = 17
+$MaxJava = 21
 $TestFile = 'src\test\java\com\seminar\fcm\FcmFlowTest.java'
 
 function Say($m)  { Write-Host "[test ] $m" -ForegroundColor Cyan }
@@ -61,7 +62,7 @@ function Use-Jdk {
     $javac = Get-Command javac -ErrorAction SilentlyContinue
     if ($java -and $javac) {
         $v = Get-JavaMajor $java.Source
-        if ($v -ge $MinJava) { Ok "Dung JDK $v cua he thong."; return }
+        if ($v -ge $MinJava -and $v -le $MaxJava) { Ok "Dung JDK $v cua he thong."; return }
     }
     $jdk = Join-Path $Tools 'jdk'
     if (Test-Path (Join-Path $jdk 'bin\javac.exe')) {
@@ -69,7 +70,7 @@ function Use-Jdk {
         $env:PATH      = (Join-Path $jdk 'bin') + ';' + $env:PATH
         Ok "Dung JDK portable: $jdk"; return
     }
-    Die "Chua co JDK $MinJava+. Hay chay truoc: setup.bat"
+    Die "Chua co JDK $MinJava-$MaxJava phu hop. Hay chay truoc: setup.bat"
 }
 
 function Use-Maven {
@@ -94,11 +95,21 @@ if (-not (Test-Path $TestFile)) { Die "Chua thay $TestFile. Hay chep FcmFlowTest
 Write-Host ''
 # @(...) bat buoc: neu khong PowerShell se bien mang 1 phan tu thanh chuoi va tach tung ky tu
 $mvnArgs = @(if ($args.Count -eq 0) { 'test' } else { $args })
+$eapOld = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+$jv = (& java -version 2>&1 | Select-Object -First 1)
+$ErrorActionPreference = $eapOld
+Say "JDK dang dung: $jv"
 Say ("Chay: mvn -B " + ($mvnArgs -join ' '))
 & mvn -B @mvnArgs
 $code = $LASTEXITCODE
 
 Write-Host ''
 if ($code -eq 0) { Ok 'TAT CA TEST PASS.' }
-else { Warn "Co test loi (exit $code). Xem chi tiet: target\surefire-reports\com.seminar.fcm.FcmFlowTest.txt" }
+else {
+    Warn "Co test loi (exit $code). Xem chi tiet: target\surefire-reports\com.seminar.fcm.FcmFlowTest.txt"
+    Say "Nguyen nhan goc (cac dong 'Caused by' dau tien):"
+    $causes = Get-ChildItem 'target\surefire-reports\*.txt' -ErrorAction SilentlyContinue |
+        Select-String -Pattern 'Caused by' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique -First 6
+    foreach ($c in $causes) { Write-Host ("  " + $c) }
+}
 exit $code
