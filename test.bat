@@ -1,12 +1,8 @@
 @echo off
-REM ============================================================================
-REM  test.bat - Windows, 1 FILE DUY NHAT (ben trong co chua san code PowerShell)
-REM  Double-click de chay, hoac chay trong terminal kem tham so.
-REM ============================================================================
+REM test.bat - runs the autotests only (mvn test). Run setup.bat first if JDK/Maven are missing.
 setlocal
 set "PROJECT_ROOT=%~dp0"
 set "TMPPS=%TEMP%\fcm_test_%RANDOM%.ps1"
-REM Tach phan PowerShell (tu dong danh dau BEGIN tro xuong) ra file tam
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=Get-Content -LiteralPath '%~f0' -Raw; $i=$t.IndexOf('#'+'#PS-BEGIN'); Set-Content -LiteralPath '%TMPPS%' -Value $t.Substring($i) -Encoding UTF8"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%TMPPS%" %*
 set EXITCODE=%ERRORLEVEL%
@@ -16,17 +12,7 @@ pause
 exit /b %EXITCODE%
 
 ##PS-BEGIN
-# =============================================================================
-#  test.ps1  -  Windows (PowerShell 5.1+ / PowerShell 7)
-#  CHI CHAY AUTOTEST (mvn test). Khong cai dat gi ca.
-#  Neu chua co JDK/Maven -> bao ban chay setup.bat truoc.
-#
-#  Dung (khuyen nghi: double-click test.bat), hoac:
-#    .\test.ps1                              # chay toan bo test
-#    .\test.ps1 -Dtest=FcmFlowTest test      # chi chay file FcmFlowTest
-# =============================================================================
 $ErrorActionPreference = 'Stop'
-# Lam moi PATH tu he thong (terminal mo truoc khi cai Java/Maven se bi giu PATH cu)
 try {
     $machinePath = [Environment]::ExpandEnvironmentVariables([Environment]::GetEnvironmentVariable('Path', 'Machine'))
     $userPath    = [Environment]::ExpandEnvironmentVariables([Environment]::GetEnvironmentVariable('Path', 'User'))
@@ -61,44 +47,43 @@ function Use-Jdk {
     $javac = Get-Command javac -ErrorAction SilentlyContinue
     if ($java -and $javac) {
         $v = Get-JavaMajor $java.Source
-        if ($v -ge $MinJava) { Ok "Dung JDK $v cua he thong."; return }
+        if ($v -ge $MinJava) { Ok "Using system JDK $v."; return }
     }
     $jdk = Join-Path $Tools 'jdk'
     if (Test-Path (Join-Path $jdk 'bin\javac.exe')) {
         $env:JAVA_HOME = $jdk
         $env:PATH      = (Join-Path $jdk 'bin') + ';' + $env:PATH
-        Ok "Dung JDK portable: $jdk"; return
+        Ok "Using portable JDK: $jdk"; return
     }
-    Die "Chua co JDK $MinJava+. Hay chay truoc: setup.bat"
+    Die "JDK $MinJava+ not found. Run setup.bat first."
 }
 
 function Use-Maven {
-    if (Get-Command mvn -ErrorAction SilentlyContinue) { Ok "Dung Maven cua he thong."; return }
+    if (Get-Command mvn -ErrorAction SilentlyContinue) { Ok "Using system Maven."; return }
     $mvn = Join-Path $Tools 'maven'
     if (Test-Path (Join-Path $mvn 'bin\mvn.cmd')) {
         $env:PATH = (Join-Path $mvn 'bin') + ';' + $env:PATH
-        Ok "Dung Maven portable: $mvn"; return
+        Ok "Using portable Maven: $mvn"; return
     }
-    Die "Chua co Maven. Hay chay truoc: setup.bat"
+    Die "Maven not found. Run setup.bat first."
 }
 
-if (-not (Test-Path 'pom.xml')) { Die "Khong thay pom.xml. Hay chay script o thu muc goc cua project." }
+if (-not (Test-Path 'pom.xml')) { Die "pom.xml not found. Run this script from the project root." }
 Use-Jdk
 Use-Maven
 
 if (-not ([IO.File]::ReadAllText((Join-Path $Root 'pom.xml')) -match 'spring-boot-starter-test')) {
-    Die "pom.xml chua co spring-boot-starter-test. Chay setup.bat (tu them) hoac them tay dependency nay."
+    Die "pom.xml has no spring-boot-starter-test. Run setup.bat (adds it) or add the dependency manually."
 }
-if (-not (Test-Path $TestFile)) { Die "Chua thay $TestFile. Hay chep FcmFlowTest.java vao dung duong dan do." }
+if (-not (Test-Path $TestFile)) { Die "$TestFile not found. Copy FcmFlowTest.java to that path." }
 
 Write-Host ''
-# @(...) bat buoc: neu khong PowerShell se bien mang 1 phan tu thanh chuoi va tach tung ky tu
 $mvnArgs = @(if ($args.Count -eq 0) { 'test' } else { $args })
-Say ("Chay: mvn -B " + ($mvnArgs -join ' '))
+Say ("Running: mvn -B " + ($mvnArgs -join ' '))
 & mvn -B @mvnArgs
 $code = $LASTEXITCODE
 
 Write-Host ''
-if ($code -eq 0) { Ok 'TAT CA TEST PASS.' }
-else { Warn "Co test loi (exit $code). Xem chi tiet: target\surefire-reports\com.seminar.fcm.FcmFlowTest.txt" }
+if ($code -eq 0) { Ok 'ALL TESTS PASSED.' }
+else { Warn "Some tests failed (exit $code). Details: target\surefire-reports\com.seminar.fcm.FcmFlowTest.txt" }
 exit $code

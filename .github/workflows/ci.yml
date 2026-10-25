@@ -1,6 +1,5 @@
 name: CI
 
-# Chạy mỗi khi push lên main, mở Pull Request, hoặc bấm tay ở tab Actions
 on:
   push:
     branches: [main]
@@ -8,14 +7,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ---------------------------------------------------------------------------
-  # Job 1: chạy autotest (FcmFlowTest) trên cả 3 hệ điều hành
-  # ---------------------------------------------------------------------------
   autotest:
     name: Autotest on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false          # 1 OS lỗi thì các OS khác vẫn chạy tiếp
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
@@ -25,23 +21,18 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-          cache: maven          # cache thư viện Maven cho lần chạy sau nhanh hơn
+          cache: maven
 
       - name: Run tests
         run: mvn -B test
 
-      - name: Upload test reports (khi lỗi)
+      - name: Upload test reports on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: surefire-reports-${{ matrix.os }}
           path: target/surefire-reports/
 
-  # ---------------------------------------------------------------------------
-  # Job 2: thử chính 2 script setup.sh / test.sh trên máy "sạch"
-  # PATH bị giới hạn còn thư mục hệ thống -> không thấy Maven/Homebrew của runner,
-  # mô phỏng gần giống máy Mac/Linux mới tinh. Dùng /bin/bash (macOS là bash 3.2).
-  # ---------------------------------------------------------------------------
   scripts:
     name: Scripts setup.sh + test.sh on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -54,13 +45,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: setup.sh (cài môi trường)
+      - name: setup.sh (install environment)
         run: env -u JAVA_HOME PATH="$CLEAN_PATH" /bin/bash ./setup.sh
 
-      - name: test.sh (chạy autotest)
+      - name: test.sh (run autotests)
         run: env -u JAVA_HOME PATH="$CLEAN_PATH" /bin/bash ./test.sh
 
-      - name: Upload test reports (khi lỗi)
+      - name: Upload test reports on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:

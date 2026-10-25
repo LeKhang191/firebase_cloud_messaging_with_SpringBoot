@@ -5,7 +5,6 @@ import java.time.Instant;
 @Entity
 @Table(name = "device_tokens", indexes = @Index(name = "idx_device_user", columnList = "userId"))
 public class DeviceToken {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -16,7 +15,7 @@ public class DeviceToken {
     @Column(nullable = false, unique = true, length = 1024)
     private String token;
 
-    private String platform;      // web | android | ios
+    private String platform;
 
     private Instant createdAt;
     private Instant updatedAt;

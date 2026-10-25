@@ -14,7 +14,6 @@ import java.io.InputStream;
 
 @Configuration
 public class FirebaseConfig {
-
     @Value("${firebase.credentials-path}")
     private Resource credentials;
 

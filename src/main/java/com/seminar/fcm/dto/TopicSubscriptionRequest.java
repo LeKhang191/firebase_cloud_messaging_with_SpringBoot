@@ -5,5 +5,5 @@ import jakarta.validation.constraints.Pattern;
 
 public record TopicSubscriptionRequest(
         @NotBlank String token,
-        @NotBlank @Pattern(regexp = "[a-zA-Z0-9-_.~%]+", message = "Topic chỉ gồm chữ, số, - _ . ~ %") String topic) {
+        @NotBlank @Pattern(regexp = "[a-zA-Z0-9-_.~%]+", message = "Topic may only contain letters, digits and - _ . ~ %") String topic) {
 }

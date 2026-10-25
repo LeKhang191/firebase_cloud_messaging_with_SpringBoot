@@ -9,11 +9,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-/** API gửi thông báo + quản lý topic. */
 @RestController
 @RequestMapping("/api")
 public class NotificationController {
-
     private final FcmService fcmService;
 
     public NotificationController(FcmService fcmService) {

@@ -12,7 +12,6 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> fields = new LinkedHashMap<>();
@@ -23,7 +22,6 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(FirebaseMessagingException.class)
     public ResponseEntity<Map<String, Object>> handleFcm(FirebaseMessagingException ex) {
-        // 502: lỗi nằm ở dịch vụ bên ngoài (FCM), không phải lỗi của client
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of(
                 "error", "FCM_ERROR",
                 "code", String.valueOf(ex.getMessagingErrorCode()),

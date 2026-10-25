@@ -31,13 +31,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Autotest toàn bộ flow: đăng ký thiết bị -> gửi thông báo (token / user / broadcast / topic / order)
- * -> dọn token chết.
+ * Autotest for the whole flow: device registration -> send notifications (token / user / broadcast / topic / order)
+ * -> dead token cleanup.
  *
- * FirebaseMessaging được MOCK nên KHÔNG cần file firebase-service-account.json và KHÔNG gửi thật tới FCM.
- * DB dùng H2 in-memory.
+ * FirebaseMessaging is MOCKED: no firebase-service-account.json is needed and nothing is sent to FCM.
+ * The database is in-memory H2.
  *
- * Chạy:  mvn test   (hoặc  mvn -Dtest=FcmFlowTest test)
+ * Run:  mvn test   (or  mvn -Dtest=FcmFlowTest test)
  */
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:fcmtest;DB_CLOSE_DELAY=-1",
@@ -51,7 +51,7 @@ class FcmFlowTest {
     @Autowired ObjectMapper json;
     @Autowired DeviceTokenRepository repo;
 
-    // Thay 2 bean Firebase bằng mock -> FirebaseConfig không đọc credentials
+    // Replace the two Firebase beans with mocks so FirebaseConfig does not read credentials
     @MockBean FirebaseApp firebaseApp;
     @MockBean FirebaseMessaging messaging;
 
@@ -74,12 +74,12 @@ class FcmFlowTest {
         postJson("/api/devices/register", body).andExpect(status().isOk());
     }
 
-    /** Stub sendEachForMulticast. Tham so da duoc tao xong truoc khi vao ham -> khong long stubbing. */
+    /** Stubs sendEachForMulticast. The argument is fully built before the call, so stubbing is not nested. */
     private void givenMulticast(BatchResponse response) throws Exception {
         when(messaging.sendEachForMulticast(any(MulticastMessage.class))).thenReturn(response);
     }
 
-    /** Stub messaging.send() nem FirebaseMessagingException voi ma loi cho truoc. */
+    /** Stubs messaging.send() to throw a FirebaseMessagingException with the given error code. */
     private void givenSendThrows(MessagingErrorCode code) throws Exception {
         FirebaseMessagingException ex = fcmException(code);
         when(messaging.send(any(Message.class))).thenThrow(ex);
@@ -123,7 +123,7 @@ class FcmFlowTest {
     // ------------------------------------------------------------------ 1. Device registration
 
     @Test
-    @DisplayName("Đăng ký thiết bị: platform mặc định = web, lưu vào DB")
+    @DisplayName("Register device: default platform = web, saved to DB")
     void registerDevice_defaultsPlatformToWeb() throws Exception {
         postJson("/api/devices/register", Map.of("userId", "u1", "token", "tokenAAA"))
                 .andExpect(status().isOk())
@@ -135,7 +135,7 @@ class FcmFlowTest {
     }
 
     @Test
-    @DisplayName("Đăng ký lại cùng token: upsert (không tạo bản ghi mới), đổi chủ + platform")
+    @DisplayName("Re-register same token: upsert (no new row), owner and platform updated")
     void registerDevice_sameToken_isUpsert() throws Exception {
         register("u1", "tokenAAA", "web");
         register("u2", "tokenAAA", "android");
@@ -147,7 +147,7 @@ class FcmFlowTest {
     }
 
     @Test
-    @DisplayName("Đăng ký thiếu userId/token -> 400 VALIDATION_FAILED")
+    @DisplayName("Register without userId/token -> 400 VALIDATION_FAILED")
     void registerDevice_validation() throws Exception {
         postJson("/api/devices/register", Map.of("userId", "", "token", ""))
                 .andExpect(status().isBadRequest())
@@ -159,7 +159,7 @@ class FcmFlowTest {
     }
 
     @Test
-    @DisplayName("List thiết bị theo user: token bị cắt còn 20 ký tự + '...'")
+    @DisplayName("List devices by user: token truncated to 20 chars + '...'")
     void listDevicesByUser_masksToken() throws Exception {
         String longToken = "abcdefghijklmnopqrstuvwxyz0123456789";
         register("u1", longToken, "web");
@@ -173,7 +173,7 @@ class FcmFlowTest {
     }
 
     @Test
-    @DisplayName("Hủy đăng ký thiết bị theo token")
+    @DisplayName("Unregister device by token")
     void unregisterDevice() throws Exception {
         register("u1", "tokenAAA", "web");
 
@@ -184,10 +184,10 @@ class FcmFlowTest {
         assertEquals(0, repo.count());
     }
 
-    // ------------------------------------------------------------------ 2. Gửi tới 1 token
+    // ------------------------------------------------------------------ 2. Send to a single token
 
     @Test
-    @DisplayName("Gửi tới 1 token thành công -> trả messageId")
+    @DisplayName("Send to a single token succeeds -> returns messageId")
     void sendToToken_success() throws Exception {
         when(messaging.send(any(Message.class))).thenReturn("projects/x/messages/123");
 
@@ -199,7 +199,7 @@ class FcmFlowTest {
     }
 
     @Test
-    @DisplayName("Gửi tới token thiếu title -> 400, không gọi FCM")
+    @DisplayName("Send to token without title -> 400, FCM not called")
     void sendToToken_validation() throws Exception {
         postJson("/api/notifications/token", Map.of("token", "tokenAAA", "payload", Map.of("body", "no title")))
                 .andExpect(status().isBadRequest())
@@ -209,7 +209,7 @@ class FcmFlowTest {
     }
 
     @Test
-    @DisplayName("FCM trả UNREGISTERED -> 502 FCM_ERROR và token bị xóa khỏi DB")
+    @DisplayName("FCM returns UNREGISTERED -> 502 FCM_ERROR and token removed from DB")
     void sendToToken_unregistered_removesToken() throws Exception {
         register("u1", "deadToken", "web");
         givenSendThrows(MessagingErrorCode.UNREGISTERED);
@@ -219,11 +219,11 @@ class FcmFlowTest {
                 .andExpect(jsonPath("$.error").value("FCM_ERROR"))
                 .andExpect(jsonPath("$.code").value("UNREGISTERED"));
 
-        assertTrue(repo.findByToken("deadToken").isEmpty(), "token chết phải bị xóa");
+        assertTrue(repo.findByToken("deadToken").isEmpty(), "dead token must be removed");
     }
 
     @Test
-    @DisplayName("FCM lỗi khác (INTERNAL) -> 502 nhưng GIỮ token trong DB")
+    @DisplayName("Other FCM error (INTERNAL) -> 502 but token is KEPT in DB")
     void sendToToken_otherError_keepsToken() throws Exception {
         register("u1", "goodToken", "web");
         givenSendThrows(MessagingErrorCode.INTERNAL);
@@ -235,10 +235,10 @@ class FcmFlowTest {
         assertTrue(repo.findByToken("goodToken").isPresent());
     }
 
-    // ------------------------------------------------------------------ 3. Gửi tới user (multicast)
+    // ------------------------------------------------------------------ 3. Send to user (multicast)
 
     @Test
-    @DisplayName("Gửi tới user có 3 thiết bị, 1 token chết -> success=2, failure=1, token chết bị dọn")
+    @DisplayName("Send to user with 3 devices, 1 dead token -> success=2, failure=1, dead token removed")
     void sendToUser_cleansDeadTokens() throws Exception {
         register("u1", "t1", "web");
         register("u1", "t2-dead", "android");
@@ -256,11 +256,11 @@ class FcmFlowTest {
                 .andExpect(jsonPath("$.errors.length()").value(1));
 
         assertTrue(repo.findByToken("t2-dead").isEmpty());
-        assertEquals(3, repo.count());   // t1, t3, t-other còn lại
+        assertEquals(3, repo.count());   // t1, t3 and t-other remain
     }
 
     @Test
-    @DisplayName("Lỗi không phải UNREGISTERED (QUOTA_EXCEEDED): tính failure nhưng KHÔNG xóa token")
+    @DisplayName("Non-UNREGISTERED error (QUOTA_EXCEEDED): counted as failure but token NOT removed")
     void sendToUser_nonFatalFailure_keepsToken() throws Exception {
         register("u1", "t1", "web");
         givenMulticast(batch(fail(MessagingErrorCode.QUOTA_EXCEEDED)));
@@ -275,7 +275,7 @@ class FcmFlowTest {
     }
 
     @Test
-    @DisplayName("User chưa có thiết bị nào -> 0/0 và không gọi FCM")
+    @DisplayName("User without devices -> 0/0 and FCM not called")
     void sendToUser_noDevices() throws Exception {
         postJson("/api/notifications/user/ghost", payload("Hi", "Hello"))
                 .andExpect(status().isOk())
@@ -288,7 +288,7 @@ class FcmFlowTest {
     // ------------------------------------------------------------------ 4. Broadcast
 
     @Test
-    @DisplayName("Broadcast tới thiết bị của nhiều user, dọn token chết")
+    @DisplayName("Broadcast to devices of several users, dead tokens removed")
     void broadcast_allUsers() throws Exception {
         register("u1", "t1", "web");
         register("u2", "t2-dead", "web");
@@ -306,7 +306,7 @@ class FcmFlowTest {
     }
 
     @Test
-    @DisplayName("1001 token -> chia thành 3 lô (500 + 500 + 1)")
+    @DisplayName("1001 tokens -> split into 3 batches (500 + 500 + 1)")
     void broadcast_batchesBy500() throws Exception {
         List<DeviceToken> devices = new ArrayList<>();
         for (int i = 0; i < 1001; i++) {
@@ -328,7 +328,7 @@ class FcmFlowTest {
     // ------------------------------------------------------------------ 5. Topic
 
     @Test
-    @DisplayName("Subscribe -> gửi topic -> unsubscribe")
+    @DisplayName("Subscribe -> send to topic -> unsubscribe")
     void topicFlow() throws Exception {
         TopicManagementResponse sub = mock(TopicManagementResponse.class);
         when(sub.getSuccessCount()).thenReturn(1);
@@ -355,7 +355,7 @@ class FcmFlowTest {
     }
 
     @Test
-    @DisplayName("Topic có ký tự không hợp lệ -> 400, không gọi FCM")
+    @DisplayName("Topic with invalid characters -> 400, FCM not called")
     void subscribe_invalidTopicName() throws Exception {
         postJson("/api/topics/subscribe", Map.of("token", "tokenAAA", "topic", "bad topic!"))
                 .andExpect(status().isBadRequest())
@@ -368,7 +368,7 @@ class FcmFlowTest {
     // ------------------------------------------------------------------ 6. Order demo
 
     @Test
-    @DisplayName("Cập nhật trạng thái đơn hàng -> gửi push tới mọi thiết bị của user")
+    @DisplayName("Order status update -> push to all of the user's devices")
     void orderStatus_sendsToUserDevices() throws Exception {
         register("u1", "t1", "web");
         register("u1", "t2", "android");
@@ -385,7 +385,7 @@ class FcmFlowTest {
     }
 
     @Test
-    @DisplayName("Order status sai giá trị / thiếu userId -> 400")
+    @DisplayName("Invalid order status / missing userId -> 400")
     void orderStatus_validation() throws Exception {
         postJson("/api/orders/1001/status", Map.of("userId", "u1", "status", "FLYING"))
                 .andExpect(status().isBadRequest());
@@ -401,15 +401,15 @@ class FcmFlowTest {
     // ------------------------------------------------------------------ 7. Full flow end-to-end
 
     @Test
-    @DisplayName("FULL FLOW: register 2 thiết bị -> đơn SHIPPING (1 token chết bị dọn) -> đơn DELIVERED chỉ còn 1 token")
+    @DisplayName("FULL FLOW: register 2 devices -> SHIPPING (1 dead token removed) -> DELIVERED with 1 token left")
     void fullFlow_registerThenOrderThenSelfCleaning() throws Exception {
-        // 1. user đăng ký 2 thiết bị
+        // 1. the user registers 2 devices
         register("alice", "phone-token", "android");
         register("alice", "laptop-token-dead", "web");
         mvc.perform(get("/api/devices/user/alice"))
                 .andExpect(jsonPath("$.length()").value(2));
 
-        // 2. đơn chuyển SHIPPING: laptop đã gỡ app -> UNREGISTERED
+        // 2. order goes to SHIPPING: the laptop uninstalled the app -> UNREGISTERED
         givenMulticast(batch(ok(), fail(MessagingErrorCode.UNREGISTERED)));
 
         postJson("/api/orders/2002/status", Map.of("userId", "alice", "status", "SHIPPING"))
@@ -418,12 +418,12 @@ class FcmFlowTest {
                 .andExpect(jsonPath("$.failureCount").value(1))
                 .andExpect(jsonPath("$.removedInvalidTokens[0]").value("laptop-token-dead"));
 
-        // 3. token chết đã bị dọn tự động
+        // 3. the dead token was removed automatically
         mvc.perform(get("/api/devices/user/alice"))
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].platform").value("android"));
 
-        // 4. đơn DELIVERED: lần này chỉ còn 1 thiết bị
+        // 4. order DELIVERED: only 1 device is left
         givenMulticast(batch(ok()));
 
         postJson("/api/orders/2002/status", Map.of("userId", "alice", "status", "DELIVERED"))
@@ -432,7 +432,7 @@ class FcmFlowTest {
                 .andExpect(jsonPath("$.failureCount").value(0))
                 .andExpect(jsonPath("$.removedInvalidTokens.length()").value(0));
 
-        // 5. user logout -> hủy đăng ký -> không còn thiết bị để gửi
+        // 5. user logs out -> unregister -> no device left to notify
         mvc.perform(delete("/api/devices").param("token", "phone-token")).andExpect(status().isOk());
         assertEquals(0, repo.count());
     }

@@ -1,14 +1,8 @@
 #!/usr/bin/env bash
-# =============================================================================
-#  test.sh  -  macOS / Linux
-#  CHI CHAY AUTOTEST (mvn test). Khong cai dat gi ca.
-#  Neu chua co JDK/Maven -> bao ban chay ./setup.sh truoc.
-#
-#  Dung:
-#    ./test.sh                              # chay toan bo test
-#    ./test.sh -Dtest=FcmFlowTest test      # chi chay file FcmFlowTest
-#    ./test.sh -Dtest=FcmFlowTest#fullFlow_registerThenOrderThenSelfCleaning test
-# =============================================================================
+# test.sh - macOS / Linux. Runs the autotests only (mvn test). Run ./setup.sh first if JDK/Maven are missing.
+# Usage:
+#   ./test.sh                              # run all tests
+#   ./test.sh -Dtest=FcmFlowTest test      # run only FcmFlowTest
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -32,43 +26,40 @@ java_major() {
   esac
 }
 
-# ---------------------------------------------------------------- tìm JDK
 use_jdk() {
   if command -v java >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; then
     local v; v="$(java_major "$(command -v java)")"
-    if [ "${v:-0}" -ge "$MIN_JAVA" ]; then ok "Dùng JDK $v của hệ thống."; return; fi
+    if [ "${v:-0}" -ge "$MIN_JAVA" ]; then ok "Using system JDK $v."; return; fi
   fi
   for cand in "$TOOLS/jdk/Contents/Home" "$TOOLS/jdk"; do
     if [ -x "$cand/bin/javac" ]; then
       export JAVA_HOME="$cand"; export PATH="$JAVA_HOME/bin:$PATH"
-      ok "Dùng JDK portable: $cand"; return
+      ok "Using portable JDK: $cand"; return
     fi
   done
-  die "Chưa có JDK $MIN_JAVA+. Hãy chạy trước:  ./setup.sh"
+  die "JDK $MIN_JAVA+ not found. Run first:  ./setup.sh"
 }
 
-# ---------------------------------------------------------------- tìm Maven
 use_maven() {
-  if command -v mvn >/dev/null 2>&1; then ok "Dùng Maven của hệ thống."; return; fi
+  if command -v mvn >/dev/null 2>&1; then ok "Using system Maven."; return; fi
   if [ -x "$TOOLS/maven/bin/mvn" ]; then
-    export PATH="$TOOLS/maven/bin:$PATH"; ok "Dùng Maven portable: $TOOLS/maven"; return
+    export PATH="$TOOLS/maven/bin:$PATH"; ok "Using portable Maven: $TOOLS/maven"; return
   fi
-  die "Chưa có Maven. Hãy chạy trước:  ./setup.sh"
+  die "Maven not found. Run first:  ./setup.sh"
 }
 
-# ---------------------------------------------------------------- kiểm tra project
-[ -f pom.xml ] || die "Không thấy pom.xml. Hãy chạy script này ở thư mục gốc của project."
+[ -f pom.xml ] || die "pom.xml not found. Run this script from the project root."
 use_jdk
 use_maven
 
 grep -q "spring-boot-starter-test" pom.xml \
-  || die "pom.xml chưa có spring-boot-starter-test. Chạy ./setup.sh (tự thêm) hoặc thêm tay dependency này."
+  || die "pom.xml has no spring-boot-starter-test. Run ./setup.sh (adds it) or add the dependency manually."
 [ -f "$TEST_FILE" ] \
-  || die "Chưa thấy $TEST_FILE. Hãy chép FcmFlowTest.java vào đúng đường dẫn đó."
+  || die "$TEST_FILE not found. Copy FcmFlowTest.java to that path."
 
 echo
 if [ "$#" -eq 0 ]; then set -- test; fi
-say "Chạy: mvn -B $*"
+say "Running: mvn -B $*"
 set +e
 mvn -B "$@"
 code=$?
@@ -76,8 +67,8 @@ set -e
 
 echo
 if [ "$code" -eq 0 ]; then
-  ok "TẤT CẢ TEST PASS."
+  ok "ALL TESTS PASSED."
 else
-  warn "Có test lỗi (exit $code). Xem chi tiết: target/surefire-reports/com.seminar.fcm.FcmFlowTest.txt"
+  warn "Some tests failed (exit $code). Details: target/surefire-reports/com.seminar.fcm.FcmFlowTest.txt"
 fi
 exit "$code"

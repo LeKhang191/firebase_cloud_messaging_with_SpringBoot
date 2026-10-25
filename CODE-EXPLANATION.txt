@@ -1,0 +1,85 @@
+CODE EXPLANATION - FCM + SPRING BOOT
+====================================
+
+1. WHAT AND WHY
+---------------
+FCM (Firebase Cloud Messaging) is Google's free service that pushes messages from a server to
+Android, iOS and web clients, even when the app is closed.
+It replaces client polling and a self-built push infrastructure: the server only says
+"send this message to token X".
+
+This demo covers: push notifications, notification topics, device registration.
+
+
+2. FLOW
+-------
+ Browser --(1) permission + getToken()--> FCM         returns a registration token
+ Browser --(2) POST /api/devices/register--> Spring Boot   token saved in DB with userId
+ Business event (e.g. order status changed)
+ Spring Boot --(3) Firebase Admin SDK--> FCM
+ FCM --(4) push--> device: Service Worker shows it (tab in background) or onMessage() (tab open)
+
+Two different credentials:
+ - Client -> FCM: firebase-config.js (public config) + VAPID key.
+ - Server -> FCM: service account JSON (secret, never commit it).
+
+
+3. KEY CONCEPTS
+---------------
+- Registration token: identifies one app/browser install. One user can have many tokens.
+  Tokens can expire, so stale ones must be removed.
+- Notification message (title/body): displayed by the OS/browser.
+  Data message (key/value strings): handled by the app. The demo sends both.
+- Topic: publish/subscribe channel. Clients subscribe, the server sends once to the topic.
+- Multicast: one message to up to 500 tokens per call; the result is reported per token.
+- Error UNREGISTERED: token is dead -> delete it from the DB.
+
+
+4. FILES
+--------
+config/FirebaseConfig         Initializes FirebaseApp once from the service account; exposes FirebaseMessaging bean.
+entity/DeviceToken            Table device_tokens: userId, unique token, platform, timestamps.
+repository/DeviceTokenRepository  Spring Data queries (by user, by token, delete).
+dto/*                         Request/response records with validation (@NotBlank, @Pattern).
+service/DeviceTokenService    Upsert on register, unregister, bulk removal, lookups.
+service/FcmService            sendToToken, sendToUser / sendToAll (multicast in batches of 500,
+                              removes UNREGISTERED tokens), sendToTopic, subscribe / unsubscribe.
+controller/DeviceController   Device registration API.
+controller/NotificationController  Send and topic APIs.
+controller/OrderDemoController     Demo use case: order status -> push to the user's devices.
+exception/GlobalExceptionHandler   400 for validation errors, 502 for FCM errors.
+static/index.html             Web client: register, topic, send test buttons, log panel.
+static/firebase-messaging-sw.js    Service Worker receiving background pushes.
+src/test/.../FcmFlowTest      19 autotests with a mocked FirebaseMessaging (no key needed).
+
+
+5. BEST PRACTICES AND LIMITATIONS
+---------------------------------
+Best practices
+ - Keep the service account out of git; use env var FIREBASE_CREDENTIALS or a secret manager.
+ - Store token + userId; allow many devices per user; refresh the token on every app start.
+ - Remove UNREGISTERED tokens after each send.
+ - Use topics for group messages, tokens for personal messages.
+ - In production send asynchronously (queue / worker) and retry temporary errors with backoff.
+ - Never put sensitive data in the payload.
+
+Limitations
+ - Payload max 4 KB; multicast max 500 tokens per call.
+ - Best-effort delivery, no read receipts, no guaranteed order.
+ - Web push needs HTTPS (localhost is allowed). iOS web push only works for installed PWAs.
+ - Depends on Google services (some browsers, e.g. Brave, disable them by default).
+
+
+6. THE FOUR SEMINAR QUESTIONS
+-----------------------------
+2.1 Business problem: realtime user notifications (orders, messages, reminders, alerts)
+    without polling or running your own push infrastructure.
+2.2 Integration: add firebase-admin, initialize it from a service account (FirebaseConfig),
+    wrap calls in FcmService, store tokens in DeviceToken. In a microservice architecture,
+    order-service publishes an event (Kafka/RabbitMQ) and a notification-service consumes it
+    and calls FCM. OrderDemoController marks the place where that listener would go.
+2.3 Useful for: e-commerce / food delivery (order status), chat and social apps, learning or task
+    apps (deadline reminders), booking and healthcare (appointment reminders), IoT monitoring
+    (alerts), news apps (topics).
+2.4 Reusable demo: this repository (start.bat for one-click run, howtorun.txt, README.md).
+    To reuse in another project, copy FirebaseConfig, FcmService and the DeviceToken classes.

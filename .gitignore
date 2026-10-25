@@ -3,9 +3,10 @@ data/
 *.iml
 .idea/
 .vscode/
-# Not commit for locking service account
+
+# Never commit the Firebase service account key or the local web config
 firebase-service-account.json
 src/main/resources/static/firebase-config.js
 
-# cong cu portable do setup-and-test tai ve
+# Portable tools downloaded by the setup scripts
 .tools/

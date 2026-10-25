@@ -11,7 +11,6 @@ import java.util.List;
 
 @Service
 public class DeviceTokenService {
-
     private final DeviceTokenRepository repository;
 
     public DeviceTokenService(DeviceTokenRepository repository) {

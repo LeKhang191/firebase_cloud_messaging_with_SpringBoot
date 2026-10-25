@@ -13,9 +13,8 @@ import java.util.Map;
 
 @Service
 public class FcmService {
-
     private static final Logger log = LoggerFactory.getLogger(FcmService.class);
-    private static final int MAX_BATCH = 500;   // FCM giới hạn 500 token / 1 lần multicast
+    private static final int MAX_BATCH = 500;
 
     private final FirebaseMessaging messaging;
     private final DeviceTokenService deviceTokenService;
@@ -25,9 +24,6 @@ public class FcmService {
         this.deviceTokenService = deviceTokenService;
     }
 
-    // ------------------------------------------------------------------
-    // 1) Gửi tới 1 thiết bị (token)
-    // ------------------------------------------------------------------
     public String sendToToken(String token, NotificationPayload payload) throws FirebaseMessagingException {
         Message message = Message.builder()
                 .setToken(token)
@@ -40,30 +36,22 @@ public class FcmService {
             log.info("Sent to token, messageId={}", messageId);
             return messageId;
         } catch (FirebaseMessagingException e) {
-            // UNREGISTERED = app bị gỡ / token hết hạn => xóa khỏi DB
             if (e.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED) {
                 deviceTokenService.removeTokens(List.of(token));
-                log.warn("Token UNREGISTERED, đã xóa khỏi DB");
+                log.warn("Token UNREGISTERED, removed from database");
             }
             throw e;
         }
     }
 
-    // ------------------------------------------------------------------
-    // 2) Gửi tới mọi thiết bị của 1 user (multicast)
-    // ------------------------------------------------------------------
     public SendResult sendToUser(String userId, NotificationPayload payload) throws FirebaseMessagingException {
         return sendMulticast(deviceTokenService.findTokensByUserId(userId), payload);
     }
 
-    // ------------------------------------------------------------------
-    // 3) Gửi tới tất cả thiết bị đã đăng ký (broadcast)
-    // ------------------------------------------------------------------
     public SendResult sendToAll(NotificationPayload payload) throws FirebaseMessagingException {
         return sendMulticast(deviceTokenService.findAllTokens(), payload);
     }
 
-    /** Gửi theo lô 500 token, đồng thời dọn token chết dựa trên kết quả từng token. */
     private SendResult sendMulticast(List<String> tokens, NotificationPayload payload) throws FirebaseMessagingException {
         int success = 0;
         int failure = 0;
@@ -84,7 +72,6 @@ public class FcmService {
             success += response.getSuccessCount();
             failure += response.getFailureCount();
 
-            // responses.get(i) tương ứng đúng batch.get(i)
             List<SendResponse> responses = response.getResponses();
             for (int i = 0; i < responses.size(); i++) {
                 SendResponse r = responses.get(i);
@@ -99,13 +86,10 @@ public class FcmService {
         }
 
         deviceTokenService.removeTokens(invalid);
-        log.info("Multicast xong: success={}, failure={}, removed={}", success, failure, invalid.size());
+        log.info("Multicast done: success={}, failure={}, removed={}", success, failure, invalid.size());
         return new SendResult(success, failure, invalid, errors);
     }
 
-    // ------------------------------------------------------------------
-    // 4) Topic: gửi tới mọi thiết bị đã subscribe topic
-    // ------------------------------------------------------------------
     public String sendToTopic(String topic, NotificationPayload payload) throws FirebaseMessagingException {
         Message message = Message.builder()
                 .setTopic(topic)
@@ -124,9 +108,6 @@ public class FcmService {
         return messaging.unsubscribeFromTopic(List.of(token), topic);
     }
 
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
     private Notification toNotification(NotificationPayload p) {
         Notification.Builder builder = Notification.builder()
                 .setTitle(p.title())
@@ -142,7 +123,6 @@ public class FcmService {
     }
 
     private AndroidConfig androidConfig() {
-        // HIGH: đánh thức thiết bị Android ngay cả khi đang Doze
         return AndroidConfig.builder().setPriority(AndroidConfig.Priority.HIGH).build();
     }
 }

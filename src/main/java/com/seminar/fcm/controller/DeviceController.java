@@ -9,11 +9,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
-/** API Device Registration. */
 @RestController
 @RequestMapping("/api/devices")
 public class DeviceController {
-
     private final DeviceTokenService service;
 
     public DeviceController(DeviceTokenService service) {

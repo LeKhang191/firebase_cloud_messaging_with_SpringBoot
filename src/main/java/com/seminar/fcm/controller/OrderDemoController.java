@@ -13,7 +13,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/orders")
 public class OrderDemoController {
-
     private final FcmService fcmService;
 
     public OrderDemoController(FcmService fcmService) {
@@ -23,16 +22,15 @@ public class OrderDemoController {
     @PostMapping("/{orderId}/status")
     public SendResult updateStatus(@PathVariable String orderId,
                                    @Valid @RequestBody OrderStatusRequest req) throws FirebaseMessagingException {
-        // (ở đây lẽ ra: cập nhật DB đơn hàng trước)
         String body = switch (req.status()) {
-            case CONFIRMED -> "Đơn hàng đã được xác nhận";
-            case SHIPPING -> "Đơn hàng đang trên đường giao đến bạn";
-            case DELIVERED -> "Đơn hàng đã giao thành công. Cảm ơn bạn!";
-            case CANCELLED -> "Đơn hàng đã bị hủy";
+            case CONFIRMED -> "Your order has been confirmed";
+            case SHIPPING -> "Your order is on its way";
+            case DELIVERED -> "Your order has been delivered. Thank you!";
+            case CANCELLED -> "Your order has been cancelled";
         };
 
         NotificationPayload payload = new NotificationPayload(
-                "Đơn hàng #" + orderId,
+                "Order #" + orderId,
                 body,
                 null,
                 Map.of("type", "ORDER_STATUS", "orderId", orderId, "status", req.status().name()));

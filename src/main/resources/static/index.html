@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -16,28 +16,29 @@
   </style>
 </head>
 <body>
-  <h1>FCM Demo – Spring Boot + Web Push</h1>
+  <h1>FCM Demo</h1>
+  <h2>Spring Boot - Web Push</h2>
 
   <fieldset>
-    <legend>Bước 1: Đăng ký thiết bị (Device Registration)</legend>
+    <legend>Step 1: Device registration</legend>
     <input id="userId" value="user1" placeholder="userId">
-    <button id="btnRegister">Bật thông báo &amp; đăng ký</button>
-    <button id="btnUnregister">Hủy đăng ký</button>
-    <div>Token: <code id="tokenView">(chưa có)</code></div>
+    <button id="btnRegister">Enable notifications &amp; register</button>
+    <button id="btnUnregister">Unregister</button>
+    <div>Token: <code id="tokenView">(none)</code></div>
   </fieldset>
 
   <fieldset>
-    <legend>Bước 2: Topic</legend>
+    <legend>Step 2: Topic</legend>
     <input id="topic" value="news" placeholder="topic">
     <button id="btnSub">Subscribe</button>
     <button id="btnUnsub">Unsubscribe</button>
   </fieldset>
 
   <fieldset>
-    <legend>Bước 3: Gửi thử (gọi API Spring Boot)</legend>
-    <button id="btnSendUser">Gửi cho userId ở trên</button>
-    <button id="btnSendTopic">Gửi cho topic ở trên</button>
-    <button id="btnOrder">Giả lập đơn hàng đang giao</button>
+    <legend>Step 3: Send a test (calls the Spring Boot API)</legend>
+    <button id="btnSendUser">Send to the userId above</button>
+    <button id="btnSendTopic">Send to the topic above</button>
+    <button id="btnOrder">Simulate order shipping</button>
   </fieldset>
 
   <div id="log"></div>
@@ -67,48 +68,48 @@
     $('btnRegister').onclick = async () => {
       try {
         const permission = await Notification.requestPermission();
-        if (permission !== 'granted') { log('Người dùng từ chối quyền thông báo'); return; }
+        if (permission !== 'granted') { log('Notification permission denied'); return; }
 
-        const swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        const swReg = await navigator.serviceWorker.ready;
         currentToken = await getToken(messaging, { vapidKey: self.VAPID_KEY, serviceWorkerRegistration: swReg });
         $('tokenView').textContent = currentToken;
-        log('Đã lấy FCM token');
+        log('Got FCM token');
 
         await api('POST', '/api/devices/register', {
           userId: $('userId').value, token: currentToken, platform: 'web'
         });
-      } catch (e) { log('LỖI: ' + e.message); }
+      } catch (e) { log('ERROR: ' + e.message); }
     };
 
     $('btnUnregister').onclick = async () => {
-      if (!currentToken) return log('Chưa có token');
+      if (!currentToken) return log('No token yet');
       await api('DELETE', '/api/devices?token=' + encodeURIComponent(currentToken));
       await deleteToken(messaging);
       currentToken = null;
-      $('tokenView').textContent = '(chưa có)';
+      $('tokenView').textContent = '(none)';
     };
 
     $('btnSub').onclick = () => currentToken
       ? api('POST', '/api/topics/subscribe', { token: currentToken, topic: $('topic').value })
-      : log('Chưa có token');
+      : log('No token yet');
 
     $('btnUnsub').onclick = () => currentToken
       ? api('POST', '/api/topics/unsubscribe', { token: currentToken, topic: $('topic').value })
-      : log('Chưa có token');
+      : log('No token yet');
 
     $('btnSendUser').onclick = () => api('POST', '/api/notifications/user/' + encodeURIComponent($('userId').value), {
-      title: 'Xin chào', body: 'Thông báo gửi tới user ' + $('userId').value, data: { type: 'TEST' }
+      title: 'Hello', body: 'Notification sent to user ' + $('userId').value, data: { type: 'TEST' }
     });
 
     $('btnSendTopic').onclick = () => api('POST', '/api/notifications/topic/' + encodeURIComponent($('topic').value), {
-      title: 'Tin mới', body: 'Thông báo gửi tới topic ' + $('topic').value, data: { type: 'NEWS' }
+      title: 'News', body: 'Notification sent to topic ' + $('topic').value, data: { type: 'NEWS' }
     });
 
     $('btnOrder').onclick = () => api('POST', '/api/orders/1001/status', {
       userId: $('userId').value, status: 'SHIPPING'
     });
 
-    // Foreground: tab đang mở => trình duyệt KHÔNG tự hiện thông báo, onMessage được gọi
     onMessage(messaging, (payload) => {
       log('FOREGROUND message: ' + JSON.stringify(payload));
       if (payload.notification) {
