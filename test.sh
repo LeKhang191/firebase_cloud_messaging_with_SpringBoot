@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # =============================================================================
 #  test.sh  -  macOS / Linux
-#  CHI CHAY AUTOTEST (mvn test). Khong cai dat gi ca.
-#  Neu chua co JDK/Maven -> bao ban chay ./setup.sh truoc.
+#  ONLY RUN AUTOTEST (mvn test). Don't install anything.
+#  if don't have JDK/Maven -> run ./setup.sh first.
 #
-#  Dung:
-#    ./test.sh                              # chay toan bo test
-#    ./test.sh -Dtest=FcmFlowTest test      # chi chay file FcmFlowTest
+#  Use:
+#    ./test.sh                              # running all tests
+#    ./test.sh -Dtest=FcmFlowTest test      # run FcmFlowTest file only
 #    ./test.sh -Dtest=FcmFlowTest#fullFlow_registerThenOrderThenSelfCleaning test
 # =============================================================================
 set -euo pipefail
@@ -33,45 +33,45 @@ java_major() {
   esac
 }
 
-# ---------------------------------------------------------------- tìm JDK
+# ---------------------------------------------------------------- find JDK
 use_jdk() {
   if command -v java >/dev/null 2>&1 && command -v javac >/dev/null 2>&1; then
     local v; v="$(java_major "$(command -v java)")"
-    if [ "${v:-0}" -ge "$MIN_JAVA" ] && [ "${v:-0}" -le "$MAX_JAVA" ]; then ok "Dùng JDK $v của hệ thống."; return; fi
-    warn "JDK hệ thống là bản $v (cần $MIN_JAVA-$MAX_JAVA) -> bỏ qua, tìm JDK portable."
+    if [ "${v:-0}" -ge "$MIN_JAVA" ] && [ "${v:-0}" -le "$MAX_JAVA" ]; then ok "Use JDK $v of system."; return; fi
+    warn "JDK system is version $v (need $MIN_JAVA-$MAX_JAVA) -> skipping, looking for portable JDK."
   fi
   for cand in "$TOOLS/jdk/Contents/Home" "$TOOLS/jdk"; do
     if [ -x "$cand/bin/javac" ]; then
       export JAVA_HOME="$cand"; export PATH="$JAVA_HOME/bin:$PATH"
-      ok "Dùng JDK portable: $cand"; return
+      ok "Use portable JDK: $cand"; return
     fi
   done
-  die "Chưa có JDK $MIN_JAVA-$MAX_JAVA phù hợp. Hãy chạy trước:  ./setup.sh"
+  die "No suitable JDK $MIN_JAVA-$MAX_JAVA found. Please run:  ./setup.sh"
 }
 
-# ---------------------------------------------------------------- tìm Maven
+# ---------------------------------------------------------------- find Maven
 use_maven() {
-  if command -v mvn >/dev/null 2>&1; then ok "Dùng Maven của hệ thống."; return; fi
+  if command -v mvn >/dev/null 2>&1; then ok "Use Maven of system."; return; fi
   if [ -x "$TOOLS/maven/bin/mvn" ]; then
-    export PATH="$TOOLS/maven/bin:$PATH"; ok "Dùng Maven portable: $TOOLS/maven"; return
+    export PATH="$TOOLS/maven/bin:$PATH"; ok "Use portable Maven: $TOOLS/maven"; return
   fi
-  die "Chưa có Maven. Hãy chạy trước:  ./setup.sh"
+  die "No Maven found. Please run:  ./setup.sh"
 }
 
-# ---------------------------------------------------------------- kiểm tra project
-[ -f pom.xml ] || die "Không thấy pom.xml. Hãy chạy script này ở thư mục gốc của project."
+# ---------------------------------------------------------------- test project
+[ -f pom.xml ] || die "No pom.xml found. Please run this script in the root directory of the project."
 use_jdk
 use_maven
 
 grep -q "spring-boot-starter-test" pom.xml \
-  || die "pom.xml chưa có spring-boot-starter-test. Chạy ./setup.sh (tự thêm) hoặc thêm tay dependency này."
+  || die "pom.xml does not contain spring-boot-starter-test. Run ./setup.sh (auto-add) or manually add this dependency."
 [ -f "$TEST_FILE" ] \
-  || die "Chưa thấy $TEST_FILE. Hãy chép FcmFlowTest.java vào đúng đường dẫn đó."
+  || die "No $TEST_FILE found. Please copy FcmFlowTest.java to the correct path."
 
 echo
 if [ "$#" -eq 0 ]; then set -- test; fi
-say "JDK đang dùng: $(java -version 2>&1 | head -1)"
-say "Chạy: mvn -B $*"
+say "JDK currently in use: $(java -version 2>&1 | head -1)"
+say "Running: mvn -B $*"
 set +e
 mvn -B "$@"
 code=$?
@@ -79,12 +79,12 @@ set -e
 
 echo
 if [ "$code" -eq 0 ]; then
-  ok "TẤT CẢ TEST PASS."
+  ok "ALL TESTS PASSED."
 else
-  warn "Có test lỗi (exit $code). Xem chi tiết: target/surefire-reports/com.seminar.fcm.FcmFlowTest.txt"
+  warn "Some tests failed (exit $code). See details: target/surefire-reports/com.seminar.fcm.FcmFlowTest.txt"
   echo
-  say "JDK đã dùng: $(java -version 2>&1 | head -1)"
-  say "Nguyên nhân gốc (các dòng 'Caused by' đầu tiên):"
+  say "JDK currently in use: $(java -version 2>&1 | head -1)"
+  say "Root cause (first 'Caused by' lines):"
   { grep -h "Caused by" target/surefire-reports/*.txt 2>/dev/null | awk '!seen[$0]++' | head -6 | cut -c1-400; } || true
   echo
 fi
