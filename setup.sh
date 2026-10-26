@@ -13,6 +13,7 @@ MAX_JAVA=21
 JDK_VERSION=17
 MAVEN_VERSION="3.9.9"
 TEST_FILE="src/test/java/com/seminar/fcm/FcmFlowTest.java"
+ADMIN_TEST_FILE="src/test/java/com/seminar/fcm/AdminKeyTest.java"
 
 say()  { printf '\033[1;36m[setup]\033[0m %s\n' "$*"; }
 ok()   { printf '\033[1;32m[ ok  ]\033[0m %s\n' "$*"; }
@@ -204,9 +205,25 @@ ensure_project() {
   fi
 
   [ -f "$TEST_FILE" ] || warn "$TEST_FILE not found - copy FcmFlowTest.java there before running tests."
+  [ -f "$ADMIN_TEST_FILE" ] || warn "$ADMIN_TEST_FILE not found - admin-key security tests will be missing."
 
-  if [ -f .gitignore ] && ! grep -qxF ".tools/" .gitignore; then
-    printf '\n# portable tools downloaded by the setup scripts\n.tools/\n' >> .gitignore
+  [ -f .gitignore ] || : > .gitignore
+  ensure_ignore_pattern() {
+    local pattern="$1"
+    grep -qxF -- "$pattern" .gitignore || printf '%s\n' "$pattern" >> .gitignore
+  }
+  ensure_ignore_pattern '.env'
+  ensure_ignore_pattern '.env.*'
+  ensure_ignore_pattern '!.env.example'
+  ensure_ignore_pattern '.tools/'
+  ensure_ignore_pattern 'firebase-service-account.json'
+  ensure_ignore_pattern 'src/main/resources/static/firebase-config.js'
+
+  if command -v git >/dev/null 2>&1 \
+      && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+      && git -C "$ROOT" ls-files --error-unmatch -- .env >/dev/null 2>&1; then
+    warn '.env is already tracked by Git. .gitignore cannot untrack it; run: git rm --cached .env'
+    warn 'If that key was pushed to a public repository, rotate ADMIN_KEY.'
   fi
 }
 

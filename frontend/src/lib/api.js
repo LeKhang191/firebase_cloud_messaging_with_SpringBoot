@@ -1,7 +1,28 @@
 import axios from 'axios';
 
-let adminKey = '';
-export const setAdminKey = (key) => { adminKey = key.trim(); };
+const ADMIN_KEY_STORAGE = 'fcm-demo.admin-key';
+
+function readStoredAdminKey() {
+  try {
+    return window.sessionStorage.getItem(ADMIN_KEY_STORAGE) || '';
+  } catch {
+    // Storage may be disabled by browser privacy settings; login still works in memory.
+    return '';
+  }
+}
+
+let adminKey = readStoredAdminKey();
+
+export const hasAdminKey = () => Boolean(adminKey);
+export const setAdminKey = (key) => {
+  adminKey = String(key ?? '').trim();
+  try {
+    if (adminKey) window.sessionStorage.setItem(ADMIN_KEY_STORAGE, adminKey);
+    else window.sessionStorage.removeItem(ADMIN_KEY_STORAGE);
+  } catch {
+    // If storage is unavailable, keep the key for this page load only.
+  }
+};
 
 const api = axios.create({ baseURL: '/api', timeout: 20000 });
 

@@ -17,6 +17,7 @@ TOOLS="$ROOT/.tools"
 MIN_JAVA=17
 MAX_JAVA=21
 TEST_FILE="src/test/java/com/seminar/fcm/FcmFlowTest.java"
+ADMIN_TEST_FILE="src/test/java/com/seminar/fcm/AdminKeyTest.java"
 
 say()  { printf '\033[1;36m[test ]\033[0m %s\n' "$*"; }
 ok()   { printf '\033[1;32m[ ok  ]\033[0m %s\n' "$*"; }
@@ -125,6 +126,8 @@ grep -q "spring-boot-starter-test" pom.xml \
   || die "pom.xml does not contain spring-boot-starter-test. Run ./setup.sh (auto-add) or manually add this dependency."
 [ -f "$TEST_FILE" ] \
   || die "No $TEST_FILE found. Please copy FcmFlowTest.java to the correct path."
+[ -f "$ADMIN_TEST_FILE" ] \
+  || die "No $ADMIN_TEST_FILE found. Admin-key security tests are required."
 
 echo
 if [ "$#" -eq 0 ]; then set -- test; fi
@@ -139,7 +142,7 @@ echo
 if [ "$code" -eq 0 ]; then
   ok "ALL TESTS PASSED."
 else
-  warn "Some tests failed (exit $code). See details: target/surefire-reports/com.seminar.fcm.FcmFlowTest.txt"
+  warn "Some tests failed (exit $code). Review reports in target/surefire-reports/."
   echo
   say "JDK currently in use: $(java -version 2>&1 | sed -n '1p')"
   say "Root cause (first 'Caused by' lines):"

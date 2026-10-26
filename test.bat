@@ -38,6 +38,7 @@ $Tools    = Join-Path $Root '.tools'
 $MinJava  = 17
 $MaxJava  = 21
 $TestFile = 'src\test\java\com\seminar\fcm\FcmFlowTest.java'
+$AdminTestFile = 'src\test\java\com\seminar\fcm\AdminKeyTest.java'
 
 function Say($m)  { Write-Host "[test ] $m" -ForegroundColor Cyan }
 function Ok($m)   { Write-Host "[ ok  ] $m" -ForegroundColor Green }
@@ -150,6 +151,7 @@ if (-not ([IO.File]::ReadAllText((Join-Path $Root 'pom.xml')) -match 'spring-boo
     Die "pom.xml does not contain spring-boot-starter-test. Run setup.bat (auto-add) or manually add this dependency."
 }
 if (-not (Test-Path $TestFile)) { Die "No $TestFile found. Please copy FcmFlowTest.java to the correct path." }
+if (-not (Test-Path $AdminTestFile)) { Die "No $AdminTestFile found. Admin-key security tests are required." }
 
 Write-Host ''
 # @(...) is required: otherwise PowerShell unwraps a one-element array into a string and mvn receives it split into single characters
@@ -165,7 +167,7 @@ $code = $LASTEXITCODE
 Write-Host ''
 if ($code -eq 0) { Ok 'ALL TESTS PASSED.' }
 else {
-    Warn "Some tests failed (exit $code). See details: target\surefire-reports\com.seminar.fcm.FcmFlowTest.txt"
+    Warn "Some tests failed (exit $code). Review reports in target\surefire-reports\."
     Say "Root cause (first 'Caused by' lines):"
     $causes = Get-ChildItem 'target\surefire-reports\*.txt' -ErrorAction SilentlyContinue |
         Select-String -Pattern 'Caused by' | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique -First 6

@@ -5,7 +5,7 @@ import MessageForm from '../components/MessageForm';
 import Notice from '../components/Notice';
 import LogPanel from '../components/LogPanel';
 import { BROADCAST_TOPIC } from '../lib/fcm';
-import { errorText, getConfig, listDevices, sendToDevice, sendToTopic, setAdminKey } from '../lib/api';
+import { errorText, getConfig, hasAdminKey, listDevices, sendToDevice, sendToTopic, setAdminKey } from '../lib/api';
 
 const DEFAULT_TITLE = 'Thông báo';
 const DEFAULT_BODY = 'Bạn có một thông báo mới';
@@ -35,7 +35,12 @@ export default function AdminPage({ log, logs = [], onClearLogs }) {
       setUnlocked(true);
     } catch (e) {
       setListError(errorText(e));
-      if (e?.response?.status === 401) setUnlocked(false);
+      if (e?.response?.status === 401) {
+        setUnlocked(false);
+        setDevices([]);
+        setAdminKey(''); // Forget a stale/invalid saved key so it cannot loop after refresh.
+        setKeyInput('');
+      }
     } finally {
       setLoading(false);
     }
@@ -43,7 +48,11 @@ export default function AdminPage({ log, logs = [], onClearLogs }) {
 
   useEffect(() => {
     getConfig()
-      .then((c) => { setKeyRequired(c.adminKeyRequired); if (!c.adminKeyRequired) refresh(); })
+      .then((c) => {
+        setKeyRequired(c.adminKeyRequired);
+        // On F5, re-validate the tab's saved key with the server before restoring admin access.
+        if (!c.adminKeyRequired || hasAdminKey()) refresh();
+      })
       .catch((e) => { setKeyRequired(false); setListError(errorText(e)); });
   }, [refresh]);
 

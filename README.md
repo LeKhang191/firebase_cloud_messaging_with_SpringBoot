@@ -71,7 +71,7 @@ Dùng đúng các giá trị Firebase cung cấp, bao gồm `storageBucket`. C�
 
 ### 4. Chạy ứng dụng
 
-**Windows — cách nhanh:** nhấp đúp `start.bat`, hoặc mở PowerShell tại thư mục gốc:
+**Windows — cách nhanh:** nhấp đúp `start.bat` để tự build frontend, chạy Spring Boot và mở Cloudflare Quick Tunnel; hoặc mở PowerShell tại thư mục gốc:
 
 ```powershell
 .\start.bat
@@ -92,7 +92,11 @@ chmod +x start.sh setup.sh test.sh
 ./start.sh
 ```
 
-Script sẽ kiểm tra môi trường và cấu hình cần thiết trước khi khởi động ứng dụng. Nếu máy chưa có JDK hoặc Maven tương thích, script setup có thể tải công cụ portable vào thư mục `.tools/`.
+Mặc định, `start.sh` tự build frontend, khởi động Spring Boot, tạo Cloudflare Quick Tunnel và mở link Internet. Cần Node.js 18+ và npm để build giao diện. Dùng `./start.sh --local` nếu chỉ muốn chạy ở `http://localhost:8080`, hoặc `./start.sh --skip-build` để bỏ qua bước build.
+
+Script đọc `ADMIN_KEY` từ `.env`; nếu file chưa có, script tạo mã ngẫu nhiên một lần và giữ nguyên cho các lần chạy sau. `.env` được đưa vào `.gitignore`, không commit file này lên GitHub. Nếu file đã từng được Git theo dõi, chạy `git rm --cached .env` một lần (lệnh không xóa file trên máy). Script kiểm tra môi trường và có thể tải JDK/Maven portable vào `.tools/` nếu máy chưa có công cụ tương thích.
+
+Có thể chỉ build rồi thoát bằng `./start.sh --build-only` (cần Node.js 18+).
 
 Trước khi chạy, hãy hoàn tất các bước cấu hình Firebase ở mục 2 và mục 3. Nếu script báo thiếu file cấu hình hoặc yêu cầu bổ sung thông tin, hãy làm theo hướng dẫn trên Terminal.
 
@@ -201,23 +205,33 @@ Mỗi máy khi kết nối sẽ tự tham gia topic `all_devices`, nên gửi t�
 
 ### Chia sẻ qua Cloudflare Tunnel (Windows)
 
-`start.bat` hỗ trợ tự tải `cloudflared` từ bản phát hành chính thức của Cloudflare nếu máy chưa cài, khởi động tunnel, lấy link `trycloudflare.com`, rồi tự mở link đó trong trình duyệt. Quick Tunnel là đường hầm tạm thời phục vụ demo; link đổi khi khởi động lại và chỉ hoạt động khi tiến trình tunnel còn chạy.
+`start.bat` mặc định tự build frontend, tự tải `cloudflared` từ bản phát hành chính thức của Cloudflare nếu máy chưa cài, khởi động tunnel, lấy link `trycloudflare.com`, rồi tự mở link đó trong trình duyệt. Dùng `--local` để chạy nội bộ không mở tunnel hoặc `--skip-build` để bỏ qua build frontend. Quick Tunnel là đường hầm tạm thời phục vụ demo; link đổi khi khởi động lại và chỉ hoạt động khi tiến trình tunnel còn chạy.
 
-Đặt mã admin đủ dài và khó đoán trong PowerShell trước khi mở Internet:
+`start.bat` và `start.sh` tự tạo/đọc mã admin từ `.env`; giữ file này để mã không đổi sau khi khởi động lại. Mặc định cả hai script tự mở Internet qua Quick Tunnel:
 
 ```powershell
-$env:ADMIN_KEY = "thay-bang-mot-chuoi-bi-mat-dai-it-nhat-16-ky-tu"; .\start.bat --tunnel
+.\start.bat
 ```
 
-Nếu vừa sửa giao diện React vừa muốn chia sẻ Internet, gộp cả hai bước:
+Nếu vừa sửa giao diện React:
 
 ```powershell
-$env:ADMIN_KEY = "thay-bang-mot-chuoi-bi-mat-dai-it-nhat-16-ky-tu"; .\start.bat --build-frontend --tunnel
+.\start.bat --local
 ```
 
 Khi bật `--tunnel`, script **từ chối chạy nếu thiếu `ADMIN_KEY` hoặc mã ngắn hơn 16 ký tự**. Tab Admin sẽ yêu cầu nhập mã; API đọc danh sách thiết bị và gửi tới thiết bị/topic/broadcast sẽ bị chặn nếu thiếu hoặc sai header `X-Admin-Key`. Người dùng vẫn có thể đăng ký thiết bị và gửi thông báo thử đến token của chính họ. Không dùng mã ví dụ ở trên làm mật khẩu thật.
 
-Không thêm `--tunnel` thì ứng dụng vẫn chạy nội bộ ở `http://localhost:8080`. Quick Tunnel phù hợp để demo, không phải cấu hình triển khai production.
+**macOS / Linux:** nhấp đúp trong Terminal/chạy `./start.sh`; mặc định script tự build frontend, khởi động Spring Boot, tạo Quick Tunnel, tự mở link, tự tải `cloudflared` tương ứng với kiến trúc máy nếu chưa có và đọc mã admin từ `.env`. Dùng `./start.sh --local` nếu chỉ muốn localhost:
+
+```bash
+./start.sh
+# Chỉ chạy nội bộ, không mở Internet:
+./start.sh --local
+# Bỏ qua build frontend:
+./start.sh --skip-build
+```
+
+Khi bật `--tunnel`, cả Windows và macOS/Linux đều yêu cầu `ADMIN_KEY` dài ít nhất 16 ký tự. Dùng `--local` để chỉ chạy nội bộ ở `http://localhost:8080`. Quick Tunnel phù hợp để demo, không phải cấu hình triển khai production.
 
 **iPhone/iPad:** Safari chỉ nhận thông báo web khi trang đã được thêm vào Màn hình chính (Chia sẻ → Thêm vào MH chính) và mở từ biểu tượng đó, yêu cầu iOS 16.4 trở lên. Giao diện sẽ hiện hướng dẫn này khi phát hiện thiết bị iOS.
 
@@ -272,9 +286,10 @@ Trạng thái hỗ trợ: `CONFIRMED`, `SHIPPING`, `DELIVERED`, `CANCELLED`.
 | `successCount=0`, `failureCount=0` | Kiểm tra đã đăng ký token cho đúng user đích chưa. |
 | Gửi được nhưng không thấy popup | Kiểm tra quyền thông báo của trình duyệt/hệ điều hành và trạng thái client; kết quả gửi không xác nhận hiển thị. |
 | Vào localhost thấy ứng dụng khác | Kiểm tra ứng dụng đang chiếm cổng 8080; dừng đúng tiến trình xung đột trước khi chạy. |
-| Sửa giao diện mà không thấy thay đổi | Sửa trong `frontend/src/`, chạy `build-frontend.bat` (hoặc `.sh`), rồi nhấn Ctrl+F5. |
+| Sửa giao diện mà không thấy thay đổi | Sửa trong `frontend/src/`, chạy `start.bat --build-frontend` (Windows) hoặc `./start.sh --build-frontend` (macOS/Linux), rồi tải lại trang. |
 | Tab Admin báo “Thiếu hoặc sai mã admin” | Máy chủ đang bật `ADMIN_KEY`; nhập đúng mã hoặc bỏ biến môi trường này. |
 | Admin không thấy máy của người xem | Người xem phải bấm **Cho phép thông báo** trước; danh sách tự cập nhật mỗi 5 giây. |
+| F5 làm Admin yêu cầu mã lại | Bản mới giữ mã trong `sessionStorage` của tab và kiểm tra lại với server; nếu server trả 401, nhập lại mã. |
 | `test.bat` vẫn lỗi Java dù `start.bat` chạy được | Kiểm tra môi trường của terminal chạy test. JAVA_HOME được sửa trong tiến trình start.bat không tự sửa môi trường hệ thống. |
 
 ## Cấu trúc thư mục
@@ -283,7 +298,7 @@ Trạng thái hỗ trợ: `CONFIRMED`, `SHIPPING`, `DELIVERED`, `CANCELLED`.
 |---|---|
 | `pom.xml` | Dependencies và cấu hình build Maven |
 | `start.bat` | Kiểm tra cấu hình, chuẩn bị công cụ nếu thiếu và chạy demo trên Windows |
-| `start.sh` | Kiểm tra cấu hình, chuẩn bị công cụ nếu thiếu và chạy demo trên macOS/Linux |
+| `start.sh` | Kiểm tra cấu hình, đọc `.env`, chuẩn bị công cụ nếu thiếu, chạy demo và tùy chọn Cloudflare Tunnel trên macOS/Linux |
 | `setup.bat`, `setup.sh` | Chuẩn bị môi trường |
 | `test.bat`, `test.sh` | Chạy kiểm thử |
 | `firebase-service-account.json` | Khóa server local, không commit |

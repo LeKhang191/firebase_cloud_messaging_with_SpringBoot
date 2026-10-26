@@ -1,5 +1,6 @@
 ﻿﻿@echo off
-REM start.bat - ONE-CLICK setup and run. Optional: --build-frontend, --tunnel (--public), --help.
+REM start.bat - Double-click to build frontend, start Spring Boot, and open Cloudflare Tunnel.
+REM Optional: --local (no tunnel), --skip-build, --build-only, --help.
 setlocal
 set "NO_PAUSE="
 if /I "%~1"=="--no-pause" set "NO_PAUSE=1"
@@ -36,9 +37,12 @@ $MavenVersion = '3.9.9'
 $Port         = 8080
 $Url          = "http://localhost:$Port"
 $StartArgs    = @($args | ForEach-Object { ([string]$_).ToLowerInvariant() })
-$UseTunnel    = ($StartArgs -contains '--tunnel' -or $StartArgs -contains '--public')
-$BuildFrontend = ($StartArgs -contains '--build-frontend')
+$UseTunnel    = -not ($StartArgs -contains '--local')
+if ($StartArgs -contains '--tunnel' -or $StartArgs -contains '--public') { $UseTunnel = $true }
+$BuildFrontend = -not ($StartArgs -contains '--skip-build')
+if ($StartArgs -contains '--build-frontend') { $BuildFrontend = $true }
 $BuildOnly    = ($StartArgs -contains '--build-only')
+if ($BuildOnly) { $BuildFrontend = $true; $UseTunnel = $false }
 $ShowHelp     = ($StartArgs -contains '--help' -or $StartArgs -contains '-h')
 $ServiceAcc   = Join-Path $Root 'firebase-service-account.json'
 $WebCfg       = Join-Path $Root 'src\main\resources\static\firebase-config.js'
@@ -172,13 +176,15 @@ function Open-Browser([string]$url) {
 function Show-Usage {
     Write-Host ''
     Write-Host 'Usage:' -ForegroundColor Magenta
-    Write-Host '  .\start.bat                         Run locally at http://localhost:8080'
-    Write-Host '  .\start.bat --build-frontend        Rebuild React UI, then run locally'
-    Write-Host '  .\start.bat --tunnel                Run and create a public Cloudflare link'
-    Write-Host '  .\start.bat --build-frontend --tunnel  Rebuild UI and create a public link'
+    Write-Host '  Double-click start.bat             Build UI, start Spring Boot, and create a Cloudflare link'
+    Write-Host '  .\start.bat --local               Build UI and run locally without a public tunnel'
+    Write-Host '  .\start.bat --skip-build          Skip frontend build, but create a Cloudflare link'
+    Write-Host '  .\start.bat --build-only          Build React UI and exit'
+    Write-Host '  .\start.bat --help                Show this help'
     Write-Host ''
+    Write-Host 'Default: build frontend + run Spring Boot + Cloudflare Quick Tunnel.'
     Write-Host 'ADMIN_KEY is loaded from .env (created automatically on first run). Keep .env private.'
-    Write-Host 'For --tunnel, the key must be at least 16 characters; cloudflared is downloaded if needed.'
+    Write-Host 'The public tunnel requires an ADMIN_KEY of at least 16 characters.'
 }
 
 function Build-Frontend {

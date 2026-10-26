@@ -31,6 +31,7 @@ $MaxJava      = 21
 $JdkVersion   = 17
 $MavenVersion = '3.9.9'
 $TestFile     = 'src\test\java\com\seminar\fcm\FcmFlowTest.java'
+$AdminTestFile = 'src\test\java\com\seminar\fcm\AdminKeyTest.java'
 
 function Say($m)  { Write-Host "[setup] $m" -ForegroundColor Cyan }
 function Ok($m)   { Write-Host "[ ok  ] $m" -ForegroundColor Green }
@@ -189,10 +190,28 @@ function Ensure-Project {
     }
 
     if (-not (Test-Path $TestFile)) { Warn "$TestFile not found - copy FcmFlowTest.java there before running tests." }
+    if (-not (Test-Path $AdminTestFile)) { Warn "$AdminTestFile not found - admin-key security tests will be missing." }
 
-    if (Test-Path '.gitignore') {
-        $gi = Get-Content '.gitignore' -ErrorAction SilentlyContinue
-        if ($gi -notcontains '.tools/') { Add-Content '.gitignore' "`n# portable tools downloaded by the setup scripts`n.tools/" }
+    $gitignorePath = Join-Path $Root '.gitignore'
+    if (-not (Test-Path -LiteralPath $gitignorePath)) { New-Item -ItemType File -Path $gitignorePath | Out-Null }
+    $ignoreRules = @('.env', '.env.*', '!.env.example', '.tools/', 'firebase-service-account.json', 'src/main/resources/static/firebase-config.js')
+    $existingRules = @(Get-Content -LiteralPath $gitignorePath -ErrorAction SilentlyContinue)
+    foreach ($rule in $ignoreRules) {
+        if ($existingRules -notcontains $rule) {
+            Add-Content -LiteralPath $gitignorePath -Value $rule -Encoding UTF8
+            $existingRules += $rule
+        }
+    }
+    $git = Get-Command git -ErrorAction SilentlyContinue
+    if ($git) {
+        & $git.Source -C $Root rev-parse --is-inside-work-tree *> $null
+        if ($LASTEXITCODE -eq 0) {
+            & $git.Source -C $Root ls-files --error-unmatch -- .env *> $null
+            if ($LASTEXITCODE -eq 0) {
+                Warn '.env is already tracked by Git; .gitignore cannot untrack it. Run: git rm --cached .env'
+                Warn 'If this key was pushed to a public repository, rotate ADMIN_KEY.'
+            }
+        }
     }
 }
 
