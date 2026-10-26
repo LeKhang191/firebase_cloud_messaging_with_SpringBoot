@@ -16,6 +16,7 @@ export const isConfigured = () => {
 const ua = () => navigator.userAgent || '';
 export const isIos = () => /iPad|iPhone|iPod/.test(ua()) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 export const isStandalone = () => window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
+export const isMobile = () => isIos() || /Android/i.test(ua());
 const platform = () => (isIos() ? 'ios' : /Android/i.test(ua()) ? 'android' : 'web');
 
 let messagingInstance = null;
@@ -43,6 +44,16 @@ export function useFcm(log) {
     const title = payload.notification?.title || payload.data?.title || 'Thông báo';
     const body = payload.notification?.body || payload.data?.body || '';
     log('ok', `[NHẬN] Máy này vừa nhận thông báo: "${title}" - ${body}`);
+
+    // Desktop: native OS notification (bottom-right corner on Windows). Phone: in-page popup.
+    if (!isMobile() && Notification.permission === 'granted') {
+      try {
+        const reg = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js')
+          || await navigator.serviceWorker.ready;
+        await reg.showNotification(title, { body, icon: '/icon-192.png' });
+        return;
+      } catch { /* fall back to the in-page popup below */ }
+    }
     toast.custom((t) => (
       <div className={`notif-land w-[22rem] max-w-[92vw] rounded-2xl bg-ink px-4 py-3 text-white shadow-lg ${t.visible ? '' : 'opacity-0'}`}>
         <p className="text-sm font-semibold">{title}</p>
@@ -70,10 +81,8 @@ export function useFcm(log) {
       log('ok', `Lấy token FCM thành công: ${t.slice(0, 28)}... (${t.length} ký tự)`);
 
       await registerDevice(userId, t, platform());
-      log('ok', `Đã đăng ký thiết bị "${userId}" với máy chủ.`);
       try {
         await subscribeTopic(t, BROADCAST_TOPIC);
-        log('ok', `Đã tham gia nhóm "${BROADCAST_TOPIC}" để nhận thông báo chung.`);
       } catch (e) {
         log('warn', `Chưa tham gia được nhóm "${BROADCAST_TOPIC}": ${errorText(e)}`);
       }

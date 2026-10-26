@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { KeyRound, Loader2, Radio, RefreshCw, Send, User } from 'lucide-react';
 import MessageForm from '../components/MessageForm';
 import Notice from '../components/Notice';
+import LogPanel from '../components/LogPanel';
 import { BROADCAST_TOPIC } from '../lib/fcm';
 import { errorText, getConfig, listDevices, sendToDevice, sendToTopic, setAdminKey } from '../lib/api';
 
@@ -10,7 +11,7 @@ const DEFAULT_TITLE = 'Thông báo';
 const DEFAULT_BODY = 'Bạn có một thông báo mới';
 const TOPIC_RE = /^[a-zA-Z0-9\-_.~%]+$/;
 
-export default function AdminPage({ log }) {
+export default function AdminPage({ log, logs = [], onClearLogs }) {
   const [keyRequired, setKeyRequired] = useState(null); // null = still asking the server
   const [keyInput, setKeyInput] = useState('');
   const [unlocked, setUnlocked] = useState(false);
@@ -73,11 +74,9 @@ export default function AdminPage({ log }) {
     try {
       if (mode === 'device') {
         await sendToDevice(target.id, title, body);
-        log('ok', `Đã gửi riêng tới "${target.userId}".`);
         toast.success(`Đã gửi tới ${target.userId}.`);
       } else {
         await sendToTopic(topic, title, body);
-        log('ok', `Đã chuyển cho FCM để gửi tới nhóm "${topic}".`);
         toast.success(`Đã gửi tới nhóm “${topic}”.`);
       }
     } catch (e) {
@@ -112,6 +111,7 @@ export default function AdminPage({ log }) {
           </section>
         )}
 
+        <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
         <section className="panel" aria-labelledby="compose-h">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -172,6 +172,10 @@ export default function AdminPage({ log }) {
             {sending ? 'Đang gửi…' : mode === 'device' ? 'Gửi riêng' : 'Gửi tới tất cả'}
           </button>
         </section>
+          <div className="relative min-h-[360px]">
+            <LogPanel entries={logs} onClear={onClearLogs} />
+          </div>
+        </div>
     </div>
   );
 }

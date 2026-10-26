@@ -10,23 +10,29 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Terminal-style trace of every API call, shown in the activity panel.
+// Terminal-style trace of every API call: "$ POST /api/..." when sent, "<- 200 OK ..." when answered.
 let logger = null;
 export const setApiLogger = (fn) => { logger = fn; };
-const line = (cfg, status, text) => `${(cfg?.method || '').toUpperCase()} /api${cfg?.url || ''} -> ${status} ${text}`;
-const brief = (d) => { const j = typeof d === 'string' ? d : JSON.stringify(d); return j && j.length > 110 ? j.slice(0, 110) + '...' : j; };
+const verb = (cfg) => (cfg?.method || 'get').toUpperCase();
+const brief = (d) => { const j = typeof d === 'string' ? d : JSON.stringify(d); return j && j.length > 110 ? j.slice(0, 110) + '...' : j || ''; };
+// The device list is polled every 5s by the admin page; keep it out of the terminal.
+const quiet = (cfg) => cfg?.method === 'get' && cfg?.url === '/devices';
+
+api.interceptors.request.use((config) => {
+  if (!quiet(config)) logger?.('cmd', `$ ${verb(config)} /api${config.url}`);
+  return config;
+});
 
 api.interceptors.response.use(
   (res) => {
-    // The device list is polled every 5s by the admin page; skip it to keep the log readable.
-    if (!(res.config.method === 'get' && res.config.url === '/devices')) {
-      logger?.('ok', `${line(res.config, res.status, res.statusText || 'OK')} ${brief(res.data) || ''}`);
-    }
+    if (!quiet(res.config)) logger?.('ok', `<- ${res.status} ${res.statusText || 'OK'} ${brief(res.data)}`);
     return res;
   },
   (err) => {
     const r = err.response;
-    logger?.('error', r ? `${line(err.config, r.status, r.statusText || 'Error')} ${brief(r.data) || ''}` : `${line(err.config, 'ERR', err.message)}`);
+    if (!quiet(err.config)) {
+      logger?.('error', r ? `<- ${r.status} ${r.statusText || 'Error'} ${brief(r.data)}` : `<- ERR ${err.message}`);
+    }
     return Promise.reject(err);
   }
 );

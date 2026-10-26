@@ -3,7 +3,10 @@ export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
-      fontFamily: { sans: ['"Be Vietnam Pro"', 'system-ui', 'sans-serif'] },
+      fontFamily: {
+        sans: ['"Be Vietnam Pro"', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'Consolas', 'Menlo', 'monospace'],
+      },
       colors: {
         ink: { DEFAULT: '#0E1726', soft: '#162033' },
         muted: '#5B6678',

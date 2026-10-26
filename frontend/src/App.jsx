@@ -69,7 +69,7 @@ export default function App() {
             onClearLogs={() => setLogs([])}
           />
         ) : (
-          <AdminPage log={log} />
+          <AdminPage log={log} logs={logs} onClearLogs={() => setLogs([])} />
         )}
       </main>
 
