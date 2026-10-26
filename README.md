@@ -195,23 +195,29 @@ Giao diện demo có hai tab: **Giảng viên** (tự kết nối và gửi th�
 
 Mỗi máy khi kết nối sẽ tự tham gia topic `all_devices`, nên gửi tới topic này là mọi máy cùng nhận. Mở `http://localhost:8080/#admin` để vào thẳng tab Admin.
 
-**Dựng lại giao diện sau khi sửa code trong `frontend/`** (cần Node.js 18+): chạy `build-frontend.bat` (Windows) hoặc `./build-frontend.sh` (macOS/Linux). Script build rồi chép kết quả vào `src/main/resources/static/`. Bản build sẵn đã nằm trong `static/`, nên chỉ chạy `start.bat` là có giao diện.
+**Dựng lại giao diện sau khi sửa code trong `frontend/`** (cần Node.js 18+): trên Windows có thể chạy `start.bat --build-frontend` để build React, chép kết quả vào `src/main/resources/static/`, rồi khởi động ứng dụng trong cùng một lần chạy. `build-frontend.bat` vẫn được giữ để tương thích với cách chạy cũ. Bản build sẵn đã nằm trong `static/`, nên nếu không sửa frontend thì chỉ cần `start.bat`.
 
 **Chạy chế độ phát triển:** `mvn spring-boot:run` ở thư mục gốc, rồi `cd frontend && npm install && npm run dev`, mở http://localhost:5173 (Vite tự chuyển tiếp `/api` và `/firebase-config.js` sang cổng 8080).
 
-### Chia sẻ qua Cloudflare Tunnel
+### Chia sẻ qua Cloudflare Tunnel (Windows)
 
-```text
-cloudflared tunnel --url http://localhost:8080
-```
+`start.bat` hỗ trợ tự tải `cloudflared` từ bản phát hành chính thức của Cloudflare nếu máy chưa cài, khởi động tunnel, lấy link `trycloudflare.com`, rồi tự mở link đó trong trình duyệt. Quick Tunnel là đường hầm tạm thời phục vụ demo; link đổi khi khởi động lại và chỉ hoạt động khi tiến trình tunnel còn chạy.
 
-Lệnh in ra một link `https://….trycloudflare.com`. Link này **đổi mỗi lần chạy lại lệnh**, nên gửi link mới cho người xem mỗi lần demo. Khi mở link ra Internet, nên đặt mã admin để người ngoài không gửi thông báo bừa được:
+Đặt mã admin đủ dài và khó đoán trong PowerShell trước khi mở Internet:
 
 ```powershell
-$env:ADMIN_KEY = "mat-khau-cua-ban"; .\start.bat
+$env:ADMIN_KEY = "thay-bang-mot-chuoi-bi-mat-dai-it-nhat-16-ky-tu"; .\start.bat --tunnel
 ```
 
-Khi `ADMIN_KEY` được đặt, tab Admin yêu cầu nhập mã. Việc đăng ký thiết bị và gửi thử cho chính máy mình vẫn mở. Nếu không đặt, mọi API đều mở như trước (chỉ nên dùng trên localhost).
+Nếu vừa sửa giao diện React vừa muốn chia sẻ Internet, gộp cả hai bước:
+
+```powershell
+$env:ADMIN_KEY = "thay-bang-mot-chuoi-bi-mat-dai-it-nhat-16-ky-tu"; .\start.bat --build-frontend --tunnel
+```
+
+Khi bật `--tunnel`, script **từ chối chạy nếu thiếu `ADMIN_KEY` hoặc mã ngắn hơn 16 ký tự**. Tab Admin sẽ yêu cầu nhập mã; API đọc danh sách thiết bị và gửi tới thiết bị/topic/broadcast sẽ bị chặn nếu thiếu hoặc sai header `X-Admin-Key`. Người dùng vẫn có thể đăng ký thiết bị và gửi thông báo thử đến token của chính họ. Không dùng mã ví dụ ở trên làm mật khẩu thật.
+
+Không thêm `--tunnel` thì ứng dụng vẫn chạy nội bộ ở `http://localhost:8080`. Quick Tunnel phù hợp để demo, không phải cấu hình triển khai production.
 
 **iPhone/iPad:** Safari chỉ nhận thông báo web khi trang đã được thêm vào Màn hình chính (Chia sẻ → Thêm vào MH chính) và mở từ biểu tượng đó, yêu cầu iOS 16.4 trở lên. Giao diện sẽ hiện hướng dẫn này khi phát hiện thiết bị iOS.
 

@@ -1,14 +1,16 @@
-﻿@echo off
-REM start.bat - ONE CLICK: installs missing tools, checks Firebase config, runs the app. Double-click to run.
+﻿﻿@echo off
+REM start.bat - ONE-CLICK setup and run. Optional: --build-frontend, --tunnel (--public), --help.
 setlocal
+set "NO_PAUSE="
+if /I "%~1"=="--no-pause" set "NO_PAUSE=1"
 set "PROJECT_ROOT=%~dp0"
 set "TMPPS=%TEMP%\fcm_start_%RANDOM%.ps1"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$t=Get-Content -LiteralPath '%~f0' -Raw; $i=$t.IndexOf('#'+'#PS-BEGIN'); Set-Content -LiteralPath '%TMPPS%' -Value $t.Substring($i) -Encoding UTF8"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%TMPPS%" %*
 set EXITCODE=%ERRORLEVEL%
 del "%TMPPS%" >nul 2>&1
-echo.
-pause
+if not defined NO_PAUSE echo.
+if not defined NO_PAUSE pause
 exit /b %EXITCODE%
 
 ##PS-BEGIN
@@ -23,6 +25,7 @@ try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::
 
 $Root = $env:PROJECT_ROOT.TrimEnd('\')
 Set-Location -LiteralPath $Root
+
 $Tools        = Join-Path $Root '.tools'
 $JdkDir       = Join-Path $Tools 'jdk'
 $MvnDir       = Join-Path $Tools 'maven'
@@ -32,6 +35,11 @@ $JdkVersion   = 17
 $MavenVersion = '3.9.9'
 $Port         = 8080
 $Url          = "http://localhost:$Port"
+$StartArgs    = @($args | ForEach-Object { ([string]$_).ToLowerInvariant() })
+$UseTunnel    = ($StartArgs -contains '--tunnel' -or $StartArgs -contains '--public')
+$BuildFrontend = ($StartArgs -contains '--build-frontend')
+$BuildOnly    = ($StartArgs -contains '--build-only')
+$ShowHelp     = ($StartArgs -contains '--help' -or $StartArgs -contains '-h')
 $ServiceAcc   = Join-Path $Root 'firebase-service-account.json'
 $WebCfg       = Join-Path $Root 'src\main\resources\static\firebase-config.js'
 $WebCfgSample = Join-Path $Root 'src\main\resources\static\firebase-config.example.js'
@@ -40,6 +48,38 @@ function Say($m)  { Write-Host "[start] $m" -ForegroundColor Cyan }
 function Ok($m)   { Write-Host "[ ok  ] $m" -ForegroundColor Green }
 function Warn($m) { Write-Host "[warn ] $m" -ForegroundColor Yellow }
 function Die($m)  { Write-Host "[error] $m" -ForegroundColor Red; exit 1 }
+
+# Load ADMIN_KEY from .env. If absent, create a stable random secret once.
+$EnvFile = Join-Path $Root '.env'
+if (-not (Test-Path -LiteralPath $EnvFile)) {
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $bytes = New-Object byte[] 32
+        $rng.GetBytes($bytes)
+        $newKey = [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+','-').Replace('/','_')
+    } finally { $rng.Dispose() }
+    Set-Content -LiteralPath $EnvFile -Value ("ADMIN_KEY=" + $newKey) -Encoding ASCII
+    Say "Created .env with a new random ADMIN_KEY. Keep this file private."
+}
+
+$loadedAdminKey = $null
+if (Test-Path -LiteralPath $EnvFile) {
+    foreach ($line in (Get-Content -LiteralPath $EnvFile -Encoding UTF8)) {
+        if ($line -match '^\s*ADMIN_KEY\s*=\s*(.*?)\s*$') {
+            $loadedAdminKey = $Matches[1].Trim()
+            if (($loadedAdminKey.Length -ge 2) -and
+                (($loadedAdminKey.StartsWith('"') -and $loadedAdminKey.EndsWith('"')) -or
+                 ($loadedAdminKey.StartsWith("'") -and $loadedAdminKey.EndsWith("'")))) {
+                $loadedAdminKey = $loadedAdminKey.Substring(1, $loadedAdminKey.Length - 2)
+            }
+            break
+        }
+    }
+}
+if ([string]::IsNullOrWhiteSpace($loadedAdminKey)) {
+    Die "ADMIN_KEY is missing or empty in .env. Add a line such as ADMIN_KEY=your-long-random-secret."
+}
+$env:ADMIN_KEY = $loadedAdminKey
 
 function Get-JavaMajor([string]$javaExe) {
     $old = $ErrorActionPreference
@@ -82,6 +122,25 @@ function Download($urls, $file) {
     Die "Could not download from any source. Check your network / VPN / proxy / firewall and run again."
 }
 
+function Ensure-Cloudflared {
+    $installed = Get-Command cloudflared -CommandType Application -ErrorAction SilentlyContinue
+    if ($installed) {
+        Ok "cloudflared found: $($installed.Source)"
+        return $installed.Source
+    }
+    New-Item -ItemType Directory -Force -Path $Tools | Out-Null
+    $exe = Join-Path $Tools 'cloudflared.exe'
+    if (-not (Test-Path -LiteralPath $exe) -or (Get-Item -LiteralPath $exe).Length -lt 10MB) {
+        Say 'Downloading cloudflared from the official Cloudflare GitHub release ...'
+        Download 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe' $exe
+    }
+    if ((Get-Item -LiteralPath $exe).Length -lt 10MB) { Die 'Downloaded cloudflared.exe is unexpectedly small; refusing to run it.' }
+    $versionOutput = (& $exe --version 2>&1 | Out-String)
+    if ($LASTEXITCODE -ne 0) { Die 'cloudflared.exe failed its version check.' }
+    Ok "Using $($versionOutput.Trim())"
+    return $exe
+}
+
 function Expand-Flat($zip, $dest) {
     $tmp = Join-Path $Tools ('_extract_' + [guid]::NewGuid().ToString('N'))
     Expand-Archive -LiteralPath $zip -DestinationPath $tmp -Force
@@ -108,6 +167,47 @@ function Open-Browser([string]$url) {
         if ($c -and (Test-Path -LiteralPath $c)) { Start-Process -FilePath $c -ArgumentList $url; return }
     }
     Start-Process $url
+}
+
+function Show-Usage {
+    Write-Host ''
+    Write-Host 'Usage:' -ForegroundColor Magenta
+    Write-Host '  .\start.bat                         Run locally at http://localhost:8080'
+    Write-Host '  .\start.bat --build-frontend        Rebuild React UI, then run locally'
+    Write-Host '  .\start.bat --tunnel                Run and create a public Cloudflare link'
+    Write-Host '  .\start.bat --build-frontend --tunnel  Rebuild UI and create a public link'
+    Write-Host ''
+    Write-Host 'ADMIN_KEY is loaded from .env (created automatically on first run). Keep .env private.'
+    Write-Host 'For --tunnel, the key must be at least 16 characters; cloudflared is downloaded if needed.'
+}
+
+function Build-Frontend {
+    $node = Get-Command node -CommandType Application -ErrorAction SilentlyContinue
+    $npm = Get-Command npm -CommandType Application -ErrorAction SilentlyContinue
+    if (-not $node -or -not $npm) { Die 'Building the frontend requires Node.js 18+ (npm included). Install Node.js, then retry.' }
+    $nodeVersion = (& $node.Source -v 2>&1 | Out-String).Trim()
+    $nodeMajor = 0
+    if ($nodeVersion -match '^v?(\d+)') { $nodeMajor = [int]$Matches[1] }
+    if ($nodeMajor -lt 18) { Die "Node.js 18+ is required; found '$nodeVersion'." }
+
+    $frontendDir = Join-Path $Root 'frontend'
+    $staticDir = Join-Path $Root 'src\main\resources\static'
+    $distDir = Join-Path $frontendDir 'dist'
+    if (-not (Test-Path -LiteralPath (Join-Path $frontendDir 'package.json'))) { Die 'frontend\package.json was not found.' }
+    Say "Building React frontend with Node.js $nodeVersion ..."
+    Push-Location -LiteralPath $frontendDir
+    try {
+        & $npm.Source install --no-audit --no-fund
+        if ($LASTEXITCODE -ne 0) { Die "npm install failed with exit code $LASTEXITCODE." }
+        & $npm.Source run build
+        if ($LASTEXITCODE -ne 0) { Die "npm run build failed with exit code $LASTEXITCODE." }
+    } finally { Pop-Location }
+    if (-not (Test-Path -LiteralPath (Join-Path $distDir 'index.html'))) { Die 'Frontend build did not create dist\index.html.' }
+    New-Item -ItemType Directory -Force -Path $staticDir | Out-Null
+    $staticAssets = Join-Path $staticDir 'assets'
+    if (Test-Path -LiteralPath $staticAssets) { Remove-Item -LiteralPath $staticAssets -Recurse -Force }
+    Copy-Item -Path (Join-Path $distDir '*') -Destination $staticDir -Recurse -Force
+    Ok 'Frontend built and copied into src\main\resources\static.'
 }
 
 function Ensure-Jdk {
@@ -258,6 +358,21 @@ Write-Host ''
 Write-Host '=== FCM + Spring Boot demo : ONE CLICK INSTALL & RUN ===' -ForegroundColor Magenta
 if (-not (Test-Path -LiteralPath (Join-Path $Root 'pom.xml'))) { Die "pom.xml not found. Keep start.bat in the project root." }
 
+if ($ShowHelp) { Show-Usage; exit 0 }
+if ($BuildOnly -and -not $BuildFrontend) { Die '--build-only can only be used together with --build-frontend.' }
+if ($UseTunnel -and [string]::IsNullOrWhiteSpace($env:ADMIN_KEY)) {
+    Die 'Refusing to expose the app without ADMIN_KEY. Add ADMIN_KEY to the .env file, then retry.'
+}
+if ($UseTunnel -and $env:ADMIN_KEY.Trim().Length -lt 16) {
+    Die 'ADMIN_KEY must contain at least 16 characters when using a public tunnel. Use a long, unpredictable secret.'
+}
+
+if ($BuildFrontend) { Build-Frontend }
+if ($BuildOnly) { Ok 'Build-only mode complete; the application was not started.'; exit 0 }
+
+$CloudflaredExe = $null
+if ($UseTunnel) { $CloudflaredExe = Ensure-Cloudflared }
+
 Ensure-Jdk
 Ensure-Maven
 Ensure-ServiceAccount
@@ -265,6 +380,9 @@ Ensure-WebConfig
 Check-ProjectMatch
 
 if (Test-PortBusy $Port) {
+    if ($UseTunnel) {
+        Die "Port $Port is already in use. Stop the existing app and relaunch this script so the ADMIN_KEY setting is applied before opening a public tunnel."
+    }
     Warn "Port $Port is already in use (the app may already be running)."
     Say "Opening browser: $Url"
     Open-Browser $Url
@@ -287,9 +405,51 @@ if (-not $up) {
     Die "The application failed to start. See the ERROR lines above."
 }
 
+$TunnelProc = $null
+$PublicUrl = $null
+$OpenUrl = $Url
+if ($UseTunnel) {
+    $TunnelLogOut = Join-Path $env:TEMP ("fcm_cloudflared_$PID.out.log")
+    $TunnelLogErr = Join-Path $env:TEMP ("fcm_cloudflared_$PID.err.log")
+    Remove-Item -LiteralPath $TunnelLogOut, $TunnelLogErr -Force -ErrorAction SilentlyContinue
+    Say 'Starting Cloudflare Quick Tunnel ...'
+    $TunnelProc = Start-Process -FilePath $CloudflaredExe -ArgumentList @('tunnel', '--url', $Url) -NoNewWindow -RedirectStandardOutput $TunnelLogOut -RedirectStandardError $TunnelLogErr -PassThru
+    $tunnelDeadline = (Get-Date).AddSeconds(90)
+    while ((Get-Date) -lt $tunnelDeadline) {
+        if ($TunnelProc.HasExited) { break }
+        $logText = ''
+        if (Test-Path -LiteralPath $TunnelLogOut) { $logText += Get-Content -LiteralPath $TunnelLogOut -Raw -ErrorAction SilentlyContinue }
+        if (Test-Path -LiteralPath $TunnelLogErr) { $logText += "`n" + (Get-Content -LiteralPath $TunnelLogErr -Raw -ErrorAction SilentlyContinue) }
+        if ($logText -match 'https://[a-zA-Z0-9-]+\.trycloudflare\.com') { $PublicUrl = $Matches[0]; break }
+        Start-Sleep -Seconds 2
+    }
+    if (-not $PublicUrl) {
+        if ($TunnelProc -and -not $TunnelProc.HasExited) { Stop-Process -Id $TunnelProc.Id -Force -ErrorAction SilentlyContinue }
+        if (-not $proc.HasExited) { & taskkill /PID $proc.Id /T /F | Out-Null }
+        Die "Could not obtain a Cloudflare URL. Check the cloudflared output files in $env:TEMP and your network, then retry."
+    }
+    $OpenUrl = $PublicUrl
+    Write-Host ''
+    Ok "PUBLIC LINK (share this URL): $PublicUrl"
+    Warn 'Anyone with this link can open the app. Admin APIs require the ADMIN_KEY you set.'
+    Warn 'This temporary Quick Tunnel URL changes when restarted and is intended for testing/demo use.'
+}
+
 Write-Host ''
 Ok "APPLICATION IS RUNNING: $Url"
-Say "Opening browser. To stop the app press Ctrl+C or close this window."
-Open-Browser $Url
-$proc.WaitForExit()
+Say "Opening browser: $OpenUrl"
+Open-Browser $OpenUrl
+try {
+    while (-not $proc.HasExited) {
+        if ($TunnelProc -and $TunnelProc.HasExited) {
+            Warn 'Cloudflare Tunnel stopped; stopping the app as well.'
+            & taskkill /PID $proc.Id /T /F | Out-Null
+            break
+        }
+        Start-Sleep -Seconds 1
+    }
+} finally {
+    if ($TunnelProc -and -not $TunnelProc.HasExited) { Stop-Process -Id $TunnelProc.Id -Force -ErrorAction SilentlyContinue }
+    if ($TunnelLogOut) { Remove-Item -LiteralPath $TunnelLogOut, $TunnelLogErr -Force -ErrorAction SilentlyContinue }
+}
 exit $proc.ExitCode
