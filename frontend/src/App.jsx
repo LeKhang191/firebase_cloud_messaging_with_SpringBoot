@@ -45,7 +45,7 @@ export default function App() {
   return (
     <div className="min-h-screen">
       <header className="bg-ink text-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-flame text-flame-ink"><Flame size={22} strokeWidth={2.4} /></span>
             <div>
@@ -60,7 +60,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         {tab === 'lecturer' ? (
           <LecturerPage
             fcm={fcm}

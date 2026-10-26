@@ -80,8 +80,8 @@ export default function LecturerPage({ fcm, log, logs = [], onClearLogs }) {
         {fcm.error && <div className="mt-3"><Notice tone="error">{fcm.error}</Notice></div>}
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        <section className="panel lg:col-span-6 flex flex-col justify-between" aria-labelledby="test-h">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+        <section className="panel flex flex-col justify-between" aria-labelledby="test-h">
           <div>
             <h2 id="test-h" className="flex items-center gap-2 text-lg font-bold">
               <Send size={18} /> Gửi thử cho chính thiết bị này
@@ -116,7 +116,7 @@ export default function LecturerPage({ fcm, log, logs = [], onClearLogs }) {
           </div>
         </section>
 
-        <div className="lg:col-span-6 flex flex-col min-h-[380px]">
+        <div className="flex flex-col min-h-[360px]">
           <LogPanel entries={logs} onClear={onClearLogs} />
         </div>
       </div>
