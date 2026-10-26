@@ -1,26 +1,62 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 
-const tone = { info: 'text-white/80', ok: 'text-[#5EEAD4]', warn: 'text-flame', error: 'text-[#FCA5A5]' };
-
-/** Always-visible activity feed (token, HTTP status, received messages), newest at the bottom. */
-export default function LogPanel({ entries, onClear }) {
-  const box = useRef(null);
-  useEffect(() => { if (box.current) box.current.scrollTop = box.current.scrollHeight; }, [entries]);
-
+export default function LogPanel({ entries = [], onClear }) {
   return (
-    <section className="flex h-[70vh] min-h-[320px] flex-col overflow-hidden rounded-2xl bg-ink-soft text-white lg:h-[calc(100vh-3rem)]" aria-label="Nhật ký hoạt động">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-        <h2 className="text-sm font-semibold">Nhật ký hoạt động</h2>
-        <button type="button" onClick={onClear} className="text-sm text-white/60 underline underline-offset-2 hover:text-white">Xóa</button>
+    <div className="flex flex-col h-full min-h-[380px] max-h-[460px] rounded-2xl bg-[#131b26] text-slate-100 shadow-md border border-[#1f2937] overflow-hidden">
+      <div className="flex items-center justify-between border-b border-[#232f3e] px-5 py-3.5 select-none">
+        <h2 className="text-sm font-bold text-white tracking-wide">
+          Nhật ký hoạt động
+        </h2>
+        {onClear && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-xs text-slate-400 hover:text-white underline transition-colors"
+          >
+            Xóa
+          </button>
+        )}
       </div>
-      <div ref={box} className="flex-1 space-y-1.5 overflow-auto px-4 py-3 text-[13px] leading-relaxed" aria-live="polite">
-        {entries.length === 0 && <p className="text-white/50">Chưa có hoạt động. Lấy token, mã trạng thái 200 OK và thông báo nhận được sẽ hiện ở đây.</p>}
-        {entries.map((e) => (
-          <p key={e.id} className={`break-words ${tone[e.level]}`}>
-            <span className="text-white/40">{e.time}</span> {e.text}
-          </p>
-        ))}
+
+      <div className="flex-1 p-5 overflow-y-auto font-mono text-xs leading-relaxed space-y-3">
+        {entries.length === 0 ? (
+          <div className="text-slate-400 text-xs leading-relaxed">
+            Chưa có hoạt động. Lấy token, mã trạng thái 200 OK và thông báo nhận được sẽ hiện ở đây.
+          </div>
+        ) : (
+          entries.map((entry) => {
+            const isOk =
+              entry.level === 'ok' ||
+              entry.text?.includes('200') ||
+              entry.text?.toLowerCase().includes('ok') ||
+              entry.text?.includes('thành công');
+            const isErr =
+              entry.level === 'error' ||
+              entry.text?.includes('thất bại') ||
+              entry.text?.includes('Error');
+
+            return (
+              <div key={entry.id} className="flex items-start gap-2 break-all">
+                <span className="select-none text-slate-500 text-[11px] whitespace-nowrap">
+                  [{entry.time}]
+                </span>
+                <span className="select-none text-slate-500">&gt;</span>
+                <span
+                  className={
+                    isOk
+                      ? 'text-emerald-400 font-medium'
+                      : isErr
+                      ? 'text-rose-400 font-medium'
+                      : 'text-slate-300'
+                  }
+                >
+                  {entry.text}
+                </span>
+              </div>
+            );
+          })
+        )}
       </div>
-    </section>
+    </div>
   );
 }

@@ -3,7 +3,6 @@ import { Toaster } from 'react-hot-toast';
 import { Flame } from 'lucide-react';
 import LecturerPage from './pages/LecturerPage';
 import AdminPage from './pages/AdminPage';
-import LogPanel from './components/LogPanel';
 import { useFcm } from './lib/fcm';
 import { setApiLogger } from './lib/api';
 
@@ -46,7 +45,7 @@ export default function App() {
   return (
     <div className="min-h-screen">
       <header className="bg-ink text-white">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-flame text-flame-ink"><Flame size={22} strokeWidth={2.4} /></span>
             <div>
@@ -61,11 +60,17 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-5xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <div>{tab === 'lecturer' ? <LecturerPage fcm={fcm} log={log} /> : <AdminPage log={log} />}</div>
-        <aside className="lg:sticky lg:top-6 lg:self-start">
-          <LogPanel entries={logs} onClear={() => setLogs([])} />
-        </aside>
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+        {tab === 'lecturer' ? (
+          <LecturerPage
+            fcm={fcm}
+            log={log}
+            logs={logs}
+            onClearLogs={() => setLogs([])}
+          />
+        ) : (
+          <AdminPage log={log} />
+        )}
       </main>
 
       <Toaster position="top-center" />
