@@ -10,3 +10,8 @@ src/main/resources/static/firebase-config.js
 
 # Portable tools downloaded by the setup scripts
 .tools/
+
+# React UI
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/

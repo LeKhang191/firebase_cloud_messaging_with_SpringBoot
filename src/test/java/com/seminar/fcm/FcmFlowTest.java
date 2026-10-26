@@ -199,13 +199,54 @@ class FcmFlowTest {
     }
 
     @Test
-    @DisplayName("Send to token without title -> 400, FCM not called")
-    void sendToToken_validation() throws Exception {
-        postJson("/api/notifications/token", Map.of("token", "tokenAAA", "payload", Map.of("body", "no title")))
+    @DisplayName("Send to token without title/body -> default text is used, FCM called")
+    void sendToToken_blankTitleAndBody_useDefaults() throws Exception {
+        when(messaging.send(any(Message.class))).thenReturn("msg-default");
+
+        postJson("/api/notifications/token", Map.of("token", "tokenAAA", "payload", Map.of("title", "  ")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.messageId").value("msg-default"));
+
+        verify(messaging).send(any(Message.class));
+    }
+
+    @Test
+    @DisplayName("Title longer than 200 chars -> 400, FCM not called")
+    void sendToToken_titleTooLong() throws Exception {
+        postJson("/api/notifications/token", Map.of("token", "tokenAAA", "payload", payload("x".repeat(201), "body")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("VALIDATION_FAILED"));
 
         verifyNoInteractions(messaging);
+    }
+
+    @Test
+    @DisplayName("List all devices (admin dropdown): newest first, full token never returned")
+    void listAllDevices() throws Exception {
+        register("Thay Duc", "abcdefghijklmnopqrstuvwxyz0123456789", "web");
+        register("Co Lan", "other-token", "android");
+
+        mvc.perform(get("/api/devices"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[?(@.userId=='Thay Duc')].tokenPreview").value("abcdefghijklmnopqrst..."))
+                .andExpect(jsonPath("$[0].token").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("Send to a device by id -> messageId + owner; unknown id -> 404")
+    void sendToDeviceById() throws Exception {
+        register("Thay Duc", "tokenDuc", "web");
+        Long id = repo.findByToken("tokenDuc").orElseThrow().getId();
+        when(messaging.send(any(Message.class))).thenReturn("msg-device");
+
+        postJson("/api/notifications/device/" + id, Map.of("title", "Thay Duc oi", "body", "Link slide"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.messageId").value("msg-device"))
+                .andExpect(jsonPath("$.userId").value("Thay Duc"));
+
+        postJson("/api/notifications/device/999999", Map.of("title", "x", "body", "y"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

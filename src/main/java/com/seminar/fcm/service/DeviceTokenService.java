@@ -44,6 +44,17 @@ public class DeviceTokenService {
     }
 
     @Transactional(readOnly = true)
+    public List<DeviceToken> findAll() {
+        return repository.findAll(org.springframework.data.domain.Sort.by(
+                org.springframework.data.domain.Sort.Direction.DESC, "updatedAt"));
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Optional<DeviceToken> findById(Long id) {
+        return repository.findById(id);
+    }
+
+    @Transactional(readOnly = true)
     public List<String> findTokensByUserId(String userId) {
         return repository.findByUserId(userId).stream().map(DeviceToken::getToken).toList();
     }

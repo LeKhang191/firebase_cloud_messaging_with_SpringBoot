@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-canvas text-ink font-sans antialiased; }
+  :focus-visible { outline: 2px solid #0E1726; outline-offset: 2px; }
+}
+
+@layer components {
+  .field {
+    @apply w-full rounded-lg border border-line bg-white px-3 py-2.5 text-[15px] text-ink placeholder:text-muted/70
+           focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/15 disabled:bg-canvas disabled:text-muted;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[15px] font-semibold
+           transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary { @apply bg-flame text-flame-ink hover:bg-flame-dark; }
+  .btn-quiet { @apply border border-line bg-white text-ink hover:bg-canvas; }
+  .panel { @apply rounded-2xl border border-line bg-white p-5 sm:p-6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+@keyframes land {
+  from { transform: translateY(-14px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.notif-land { animation: land 0.28s ease-out; }

@@ -15,6 +15,8 @@ import java.util.Map;
 public class FcmService {
     private static final Logger log = LoggerFactory.getLogger(FcmService.class);
     private static final int MAX_BATCH = 500;
+    public static final String DEFAULT_TITLE = "Thông báo";
+    public static final String DEFAULT_BODY = "Bạn có một thông báo mới";
 
     private final FirebaseMessaging messaging;
     private final DeviceTokenService deviceTokenService;
@@ -110,12 +112,16 @@ public class FcmService {
 
     private Notification toNotification(NotificationPayload p) {
         Notification.Builder builder = Notification.builder()
-                .setTitle(p.title())
-                .setBody(p.body());
+                .setTitle(orDefault(p.title(), DEFAULT_TITLE))
+                .setBody(orDefault(p.body(), DEFAULT_BODY));
         if (p.imageUrl() != null && !p.imageUrl().isBlank()) {
             builder.setImage(p.imageUrl());
         }
         return builder.build();
+    }
+
+    private static String orDefault(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
     }
 
     private Map<String, String> dataOf(NotificationPayload p) {

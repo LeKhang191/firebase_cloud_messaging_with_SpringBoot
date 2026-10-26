@@ -1,121 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FCM Demo - Web Client</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 760px; margin: 24px auto; padding: 0 16px; color: #222; }
-    h1 { font-size: 1.4rem; }
-    fieldset { margin: 16px 0; border: 1px solid #ccc; border-radius: 8px; }
-    legend { font-weight: 600; }
-    input { padding: 6px 8px; margin-right: 6px; }
-    button { padding: 6px 12px; cursor: pointer; margin: 4px 4px 4px 0; }
-    #log { background: #111; color: #9f9; padding: 10px; border-radius: 8px; height: 220px; overflow: auto; font-family: monospace; font-size: 12px; white-space: pre-wrap; }
-    code { background: #eee; padding: 1px 4px; border-radius: 4px; word-break: break-all; }
-  </style>
-</head>
-<body>
-  <h1>FCM Demo</h1>
-  <h2>Spring Boot - Web Push</h2>
-
-  <fieldset>
-    <legend>Step 1: Device registration</legend>
-    <input id="userId" value="user1" placeholder="userId">
-    <button id="btnRegister">Enable notifications &amp; register</button>
-    <button id="btnUnregister">Unregister</button>
-    <div>Token: <code id="tokenView">(none)</code></div>
-  </fieldset>
-
-  <fieldset>
-    <legend>Step 2: Topic</legend>
-    <input id="topic" value="news" placeholder="topic">
-    <button id="btnSub">Subscribe</button>
-    <button id="btnUnsub">Unsubscribe</button>
-  </fieldset>
-
-  <fieldset>
-    <legend>Step 3: Send a test (calls the Spring Boot API)</legend>
-    <button id="btnSendUser">Send to the userId above</button>
-    <button id="btnSendTopic">Send to the topic above</button>
-    <button id="btnOrder">Simulate order shipping</button>
-  </fieldset>
-
-  <div id="log"></div>
-  <script src="/firebase-config.js"></script>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
-    import { getMessaging, getToken, deleteToken, onMessage } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging.js";
-
-    const $ = (id) => document.getElementById(id);
-    const log = (m) => { $('log').textContent += `[${new Date().toLocaleTimeString()}] ${m}\n`; $('log').scrollTop = 1e9; };
-
-    const app = initializeApp(self.FIREBASE_CONFIG);
-    const messaging = getMessaging(app);
-    let currentToken = null;
-
-    async function api(method, url, body) {
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined
-      });
-      const text = await res.text();
-      log(`${method} ${url} -> ${res.status} ${text}`);
-      return res;
-    }
-
-    $('btnRegister').onclick = async () => {
-      try {
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') { log('Notification permission denied'); return; }
-
-        await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-        const swReg = await navigator.serviceWorker.ready;
-        currentToken = await getToken(messaging, { vapidKey: self.VAPID_KEY, serviceWorkerRegistration: swReg });
-        $('tokenView').textContent = currentToken;
-        log('Got FCM token');
-
-        await api('POST', '/api/devices/register', {
-          userId: $('userId').value, token: currentToken, platform: 'web'
-        });
-      } catch (e) { log('ERROR: ' + e.message); }
-    };
-
-    $('btnUnregister').onclick = async () => {
-      if (!currentToken) return log('No token yet');
-      await api('DELETE', '/api/devices?token=' + encodeURIComponent(currentToken));
-      await deleteToken(messaging);
-      currentToken = null;
-      $('tokenView').textContent = '(none)';
-    };
-
-    $('btnSub').onclick = () => currentToken
-      ? api('POST', '/api/topics/subscribe', { token: currentToken, topic: $('topic').value })
-      : log('No token yet');
-
-    $('btnUnsub').onclick = () => currentToken
-      ? api('POST', '/api/topics/unsubscribe', { token: currentToken, topic: $('topic').value })
-      : log('No token yet');
-
-    $('btnSendUser').onclick = () => api('POST', '/api/notifications/user/' + encodeURIComponent($('userId').value), {
-      title: 'Hello', body: 'Notification sent to user ' + $('userId').value, data: { type: 'TEST' }
-    });
-
-    $('btnSendTopic').onclick = () => api('POST', '/api/notifications/topic/' + encodeURIComponent($('topic').value), {
-      title: 'News', body: 'Notification sent to topic ' + $('topic').value, data: { type: 'NEWS' }
-    });
-
-    $('btnOrder').onclick = () => api('POST', '/api/orders/1001/status', {
-      userId: $('userId').value, status: 'SHIPPING'
-    });
-
-    onMessage(messaging, (payload) => {
-      log('FOREGROUND message: ' + JSON.stringify(payload));
-      if (payload.notification) {
-        new Notification(payload.notification.title, { body: payload.notification.body });
-      }
-    });
-  </script>
-</body>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0E1726" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <title>FCM Demo - Thông báo đẩy</title>
+    <!-- Served by Spring Boot (git-ignored, holds the Firebase web config + VAPID key). -->
+    <script src="/firebase-config.js"></script>
+    <script type="module" crossorigin src="/assets/index-DoY0J7fy.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-uGoGsr0l.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
 </html>

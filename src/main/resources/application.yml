@@ -14,7 +14,12 @@ spring:
     open-in-view: false
   h2:
     console:
-      enabled: true
+      # Off by default: with a public tunnel the console would expose the whole token table.
+      enabled: false
 
 firebase:
   credentials-path: ${FIREBASE_CREDENTIALS:file:./firebase-service-account.json}
+
+app:
+  # Empty = admin endpoints are open (fine on localhost). Set ADMIN_KEY when sharing the demo via a tunnel.
+  admin-key: ${ADMIN_KEY:}

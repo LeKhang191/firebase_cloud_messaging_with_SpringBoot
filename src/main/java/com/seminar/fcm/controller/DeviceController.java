@@ -1,5 +1,6 @@
 package com.seminar.fcm.controller;
 
+import com.seminar.fcm.dto.DeviceInfo;
 import com.seminar.fcm.dto.RegisterDeviceRequest;
 import com.seminar.fcm.entity.DeviceToken;
 import com.seminar.fcm.service.DeviceTokenService;
@@ -30,14 +31,13 @@ public class DeviceController {
         return Map.of("status", "unregistered");
     }
 
+    @GetMapping
+    public List<DeviceInfo> listAll() {
+        return service.findAll().stream().map(DeviceInfo::from).toList();
+    }
+
     @GetMapping("/user/{userId}")
-    public List<Map<String, Object>> listByUser(@PathVariable String userId) {
-        return service.findByUserId(userId).stream()
-                .map(d -> Map.<String, Object>of(
-                        "id", d.getId(),
-                        "platform", d.getPlatform(),
-                        "tokenPreview", d.getToken().substring(0, Math.min(20, d.getToken().length())) + "...",
-                        "updatedAt", d.getUpdatedAt().toString()))
-                .toList();
+    public List<DeviceInfo> listByUser(@PathVariable String userId) {
+        return service.findByUserId(userId).stream().map(DeviceInfo::from).toList();
     }
 }

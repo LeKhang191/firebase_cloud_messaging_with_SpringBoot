@@ -183,20 +183,57 @@ Các bài kiểm thử trong `FcmFlowTest` sử dụng Firebase giả lập (moc
 
 Theo dõi kết quả trong Terminal. Chỉ xác nhận kiểm thử thành công khi Maven kết thúc với trạng thái `BUILD SUCCESS` và không có bài kiểm thử nào thất bại hoặc phát sinh lỗi.
 
+## Giao diện React (thư mục `frontend/`)
+
+Giao diện demo có hai tab: **Giảng viên** (tự kết nối và gửi thử) và **Admin** (gửi riêng một máy hoặc gửi tới tất cả). Title và Body đều sửa được trực tiếp; để trống thì máy chủ dùng nội dung mặc định.
+
+| Chế độ | Việc cần làm | API được gọi |
+|---|---|---|
+| Giảng viên tự test | Nhập tên thiết bị → **Cho phép thông báo** → sửa tiêu đề/nội dung → **Gửi thử** | `/api/devices/register`, `/api/topics/subscribe`, `/api/notifications/token` |
+| Admin gửi riêng | Chọn thiết bị trong dropdown → nhập nội dung (tùy chọn) → **Gửi riêng** | `GET /api/devices`, `/api/notifications/device/{id}` |
+| Admin gửi tất cả | Giữ topic `all_devices` → nhập nội dung (tùy chọn) → **Gửi tới tất cả** | `/api/notifications/topic/{topic}` |
+
+Mỗi máy khi kết nối sẽ tự tham gia topic `all_devices`, nên gửi tới topic này là mọi máy cùng nhận. Mở `http://localhost:8080/#admin` để vào thẳng tab Admin.
+
+**Dựng lại giao diện sau khi sửa code trong `frontend/`** (cần Node.js 18+): chạy `build-frontend.bat` (Windows) hoặc `./build-frontend.sh` (macOS/Linux). Script build rồi chép kết quả vào `src/main/resources/static/`. Bản build sẵn đã nằm trong `static/`, nên chỉ chạy `start.bat` là có giao diện.
+
+**Chạy chế độ phát triển:** `mvn spring-boot:run` ở thư mục gốc, rồi `cd frontend && npm install && npm run dev`, mở http://localhost:5173 (Vite tự chuyển tiếp `/api` và `/firebase-config.js` sang cổng 8080).
+
+### Chia sẻ qua Cloudflare Tunnel
+
+```text
+cloudflared tunnel --url http://localhost:8080
+```
+
+Lệnh in ra một link `https://….trycloudflare.com`. Link này **đổi mỗi lần chạy lại lệnh**, nên gửi link mới cho người xem mỗi lần demo. Khi mở link ra Internet, nên đặt mã admin để người ngoài không gửi thông báo bừa được:
+
+```powershell
+$env:ADMIN_KEY = "mat-khau-cua-ban"; .\start.bat
+```
+
+Khi `ADMIN_KEY` được đặt, tab Admin yêu cầu nhập mã. Việc đăng ký thiết bị và gửi thử cho chính máy mình vẫn mở. Nếu không đặt, mọi API đều mở như trước (chỉ nên dùng trên localhost).
+
+**iPhone/iPad:** Safari chỉ nhận thông báo web khi trang đã được thêm vào Màn hình chính (Chia sẻ → Thêm vào MH chính) và mở từ biểu tượng đó, yêu cầu iOS 16.4 trở lên. Giao diện sẽ hiện hướng dẫn này khi phát hiện thiết bị iOS.
+
 ## API chính
 
 | Phương thức | Endpoint | Chức năng |
 |---|---|---|
 | POST | `/api/devices/register` | Đăng ký/cập nhật token |
+| GET | `/api/devices` | Danh sách mọi thiết bị đã đăng ký (token rút gọn) |
 | GET | `/api/devices/user/{userId}` | Xem thiết bị của user, token được rút gọn |
 | DELETE | `/api/devices?token=...` | Xóa đăng ký trong backend |
 | POST | `/api/notifications/token` | Gửi đến token |
+| POST | `/api/notifications/device/{id}` | Gửi riêng đến một thiết bị theo id (dropdown của Admin) |
 | POST | `/api/notifications/user/{userId}` | Gửi đến các thiết bị của user |
 | POST | `/api/notifications/topic/{topic}` | Gửi đến topic |
 | POST | `/api/notifications/broadcast` | Gửi đến mọi token lưu trong ứng dụng |
 | POST | `/api/topics/subscribe` | Đăng ký topic |
 | POST | `/api/topics/unsubscribe` | Hủy đăng ký topic |
 | POST | `/api/orders/{orderId}/status` | Mô phỏng thông báo trạng thái đơn |
+| GET | `/api/config` | Cho giao diện biết có cần mã admin hay không |
+
+`title` và `body` của mọi API gửi là tùy chọn: để trống thì dùng “Thông báo” / “Bạn có một thông báo mới”. Giới hạn: title tối đa 200 ký tự, body tối đa 1000 ký tự. Khi đặt `ADMIN_KEY`, các API admin (danh sách thiết bị, gửi theo user/thiết bị/topic/broadcast, đơn hàng) cần header `X-Admin-Key`.
 
 Ví dụ gửi trạng thái đơn hàng bằng PowerShell:
 
@@ -229,7 +266,9 @@ Trạng thái hỗ trợ: `CONFIRMED`, `SHIPPING`, `DELIVERED`, `CANCELLED`.
 | `successCount=0`, `failureCount=0` | Kiểm tra đã đăng ký token cho đúng user đích chưa. |
 | Gửi được nhưng không thấy popup | Kiểm tra quyền thông báo của trình duyệt/hệ điều hành và trạng thái client; kết quả gửi không xác nhận hiển thị. |
 | Vào localhost thấy ứng dụng khác | Kiểm tra ứng dụng đang chiếm cổng 8080; dừng đúng tiến trình xung đột trước khi chạy. |
-| Sửa giao diện mà không thấy thay đổi | Thay đúng `src/main/resources/static/index.html`, dừng backend cũ, chạy lại và nhấn Ctrl+F5. Không dùng `preview.html` để chạy thật. |
+| Sửa giao diện mà không thấy thay đổi | Sửa trong `frontend/src/`, chạy `build-frontend.bat` (hoặc `.sh`), rồi nhấn Ctrl+F5. |
+| Tab Admin báo “Thiếu hoặc sai mã admin” | Máy chủ đang bật `ADMIN_KEY`; nhập đúng mã hoặc bỏ biến môi trường này. |
+| Admin không thấy máy của người xem | Người xem phải bấm **Cho phép thông báo** trước; danh sách tự cập nhật mỗi 5 giây. |
 | `test.bat` vẫn lỗi Java dù `start.bat` chạy được | Kiểm tra môi trường của terminal chạy test. JAVA_HOME được sửa trong tiến trình start.bat không tự sửa môi trường hệ thống. |
 
 ## Cấu trúc thư mục
@@ -248,10 +287,12 @@ Trạng thái hỗ trợ: `CONFIRMED`, `SHIPPING`, `DELIVERED`, `CANCELLED`.
 | `src/main/java/com/seminar/fcm/entity/`, `repository/` | Entity và truy cập dữ liệu |
 | `src/main/java/com/seminar/fcm/dto/`, `exception/` | Dữ liệu request/response và xử lý lỗi |
 | `src/main/resources/application.yml` | Cổng, H2 và đường dẫn credential |
-| `src/main/resources/static/index.html` | Giao diện demo |
+| `frontend/` | Mã nguồn giao diện React + Vite + Tailwind |
+| `build-frontend.bat`, `build-frontend.sh` | Build giao diện và chép vào `static/` |
+| `src/main/resources/static/index.html`, `assets/` | Giao diện đã build (sinh ra từ `frontend/`) |
 | `src/main/resources/static/firebase-config.example.js` | Mẫu cấu hình web |
 | `src/main/resources/static/firebase-config.js` | Cấu hình web local |
 | `src/main/resources/static/firebase-messaging-sw.js` | Service worker nhận thông báo nền |
-| `src/test/java/com/seminar/fcm/FcmFlowTest.java` | Kiểm thử với Firebase giả lập |
+| `src/test/java/com/seminar/fcm/FcmFlowTest.java`, `AdminKeyTest.java` | Kiểm thử với Firebase giả lập |
 
 Đây là bản demo phục vụ seminar. Trước khi triển khai công khai cần bổ sung xác thực, phân quyền API gửi, quản lý credential và cấu hình database phù hợp.

@@ -3,9 +3,13 @@ package com.seminar.fcm.controller;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.TopicManagementResponse;
 import com.seminar.fcm.dto.*;
+import com.seminar.fcm.entity.DeviceToken;
+import com.seminar.fcm.service.DeviceTokenService;
 import com.seminar.fcm.service.FcmService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
@@ -13,14 +17,26 @@ import java.util.Map;
 @RequestMapping("/api")
 public class NotificationController {
     private final FcmService fcmService;
+    private final DeviceTokenService deviceTokenService;
 
-    public NotificationController(FcmService fcmService) {
+    public NotificationController(FcmService fcmService, DeviceTokenService deviceTokenService) {
         this.fcmService = fcmService;
+        this.deviceTokenService = deviceTokenService;
     }
 
     @PostMapping("/notifications/token")
     public Map<String, String> sendToToken(@Valid @RequestBody SendToTokenRequest req) throws FirebaseMessagingException {
         return Map.of("messageId", fcmService.sendToToken(req.token(), req.payload()));
+    }
+
+    /** Admin unicast: pick a device from the list (by id) instead of handling raw tokens in the browser. */
+    @PostMapping("/notifications/device/{id}")
+    public Map<String, String> sendToDevice(@PathVariable Long id,
+                                            @Valid @RequestBody NotificationPayload payload) throws FirebaseMessagingException {
+        DeviceToken device = deviceTokenService.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Device not found: " + id));
+        return Map.of("messageId", fcmService.sendToToken(device.getToken(), payload),
+                "userId", device.getUserId());
     }
 
     @PostMapping("/notifications/user/{userId}")
