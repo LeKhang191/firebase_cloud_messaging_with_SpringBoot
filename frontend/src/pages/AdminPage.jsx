@@ -83,13 +83,13 @@ export default function AdminPage({ log, logs = [], onClearLogs }) {
     try {
       if (mode === 'device') {
         await sendToDevice(target.id, title, body);
-        toast.success(`Đã gửi tới ${target.userId}.`);
+        toast.success(`Sent to ${target.userId}.`);
       } else {
         await sendToTopic(topic, title, body);
-        toast.success(`Đã gửi tới nhóm “${topic}”.`);
+        toast.success(`Sent to topic “${topic}”.`);
       }
     } catch (e) {
-      log('error', `Gửi thất bại: ${errorText(e)}`);
+      log('error', `Failed to send: ${errorText(e)}`);
       toast.error(errorText(e));
       if (mode === 'device') refresh(); // a dead token is deleted by the server
     } finally {
@@ -109,12 +109,12 @@ export default function AdminPage({ log, logs = [], onClearLogs }) {
     <div className="space-y-6">
         {keyRequired && !unlocked && (
           <section className="panel" aria-labelledby="key-h">
-            <h2 id="key-h" className="flex items-center gap-2 text-lg font-bold"><KeyRound size={20} /> Nhập mã admin</h2>
-            <p className="mt-1 text-sm text-muted">Máy chủ đang bật mã admin (biến môi trường ADMIN_KEY) để người ngoài không gửi thông báo bừa được.</p>
+            <h2 id="key-h" className="flex items-center gap-2 text-lg font-bold"><KeyRound size={20} /> Enter Admin Key</h2>
+            <p className="mt-1 text-sm text-muted">The server is running with an admin key (ADMIN_KEY environment variable) to prevent unauthorized notifications.</p>
             <form onSubmit={unlock} className="mt-4 flex flex-wrap gap-3">
               <input type="password" className="field max-w-xs" value={keyInput} autoComplete="off"
-                     aria-label="Mã admin" onChange={(e) => setKeyInput(e.target.value)} />
-              <button type="submit" className="btn btn-primary" disabled={!keyInput.trim()}>Mở khóa</button>
+                     aria-label="Admin Key" onChange={(e) => setKeyInput(e.target.value)} />
+              <button type="submit" className="btn btn-primary" disabled={!keyInput.trim()}>Unlock</button>
             </form>
             {listError && <div className="mt-3"><Notice tone="error">{listError}</Notice></div>}
           </section>
@@ -124,22 +124,22 @@ export default function AdminPage({ log, logs = [], onClearLogs }) {
         <section className="panel" aria-labelledby="compose-h">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 id="compose-h" className="text-lg font-bold">Soạn và gửi thông báo</h2>
+              <h2 id="compose-h" className="text-lg font-bold">Compose and Send Notification</h2>
               <p className="mt-1 text-sm text-muted">
-                {unlocked ? `${devices.length} thiết bị đang đăng ký.` : 'Cần mở khóa để xem thiết bị.'}
+                {unlocked ? `${devices.length} devices are registered.` : 'Need to unlock to view devices.'}
               </p>
             </div>
             <button type="button" className="btn btn-quiet px-3" onClick={refresh} disabled={loading || (keyRequired && !unlocked)}
-                    aria-label="Tải lại danh sách thiết bị">
+                    aria-label="Refresh device list">
               <RefreshCw size={17} className={loading ? 'animate-spin' : ''} />
             </button>
           </div>
 
           {listError && unlocked && <div className="mt-3"><Notice tone="error">{listError}</Notice></div>}
 
-          <div role="radiogroup" aria-label="Kiểu gửi" className="mt-4 flex gap-1 rounded-xl border border-line bg-white p-1">
-            {modeBtn('device', User, 'Gửi riêng một máy')}
-            {modeBtn('topic', Radio, 'Gửi tới tất cả')}
+          <div role="radiogroup" aria-label="Send type" className="mt-4 flex gap-1 rounded-xl border border-line bg-white p-1">
+            {modeBtn('device', User, 'Send to a specific device')}
+            {modeBtn('topic', Radio, 'Send to all devices')}
           </div>
 
           <div className="mt-4">
@@ -148,24 +148,24 @@ export default function AdminPage({ log, logs = [], onClearLogs }) {
                 <label htmlFor="device" className="mb-1.5 block text-sm font-medium">Thiết bị nhận</label>
                 <select id="device" className="field" value={deviceId} disabled={!unlocked || devices.length === 0}
                         onChange={(e) => setDeviceId(e.target.value)}>
-                  <option value="">{devices.length ? 'Chọn thiết bị…' : 'Chưa có thiết bị nào'}</option>
+                  <option value="">{devices.length ? 'Select device…' : 'No devices available'}</option>
                   {devices.map((d) => (
                     <option key={d.id} value={d.id}>{d.userId} ({d.platform})</option>
                   ))}
                 </select>
                 {unlocked && devices.length === 0 && (
-                  <p className="mt-2 text-sm text-muted">Mở đường link này trên máy khác, nhập tên và bấm “Cho phép thông báo”. Máy đó sẽ tự xuất hiện ở đây.</p>
+                  <p className="mt-2 text-sm text-muted">Open this link on another device, enter a name, and click "Allow Notifications". That device will then appear here.</p>
                 )}
               </>
             ) : (
               <>
-                <label htmlFor="topic" className="mb-1.5 block text-sm font-medium">Nhóm nhận (topic)</label>
+                <label htmlFor="topic" className="mb-1.5 block text-sm font-medium">Topic</label>
                 <input id="topic" className="field" value={topic} onChange={(e) => setTopic(e.target.value.trim())}
                        aria-invalid={!topicValid} />
                 {!topicValid ? (
-                  <p className="mt-2 text-sm text-danger">Chỉ dùng chữ cái, số và các ký tự - _ . ~ %</p>
+                  <p className="mt-2 text-sm text-danger">Only letters, numbers and characters - _ . ~ % are allowed</p>
                 ) : (
-                  <p className="mt-2 text-sm text-muted">Mọi máy đã kết nối đều nằm trong nhóm “{BROADCAST_TOPIC}” và sẽ cùng nhận.</p>
+                  <p className="mt-2 text-sm text-muted">All connected devices are in the “{BROADCAST_TOPIC}” group and will receive the notification.</p>
                 )}
               </>
             )}
@@ -178,7 +178,7 @@ export default function AdminPage({ log, logs = [], onClearLogs }) {
 
           <button type="button" className="btn btn-primary mt-5" disabled={!canSend} onClick={send}>
             {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-            {sending ? 'Đang gửi…' : mode === 'device' ? 'Gửi riêng' : 'Gửi tới tất cả'}
+            {sending ? 'Sending…' : mode === 'device' ? 'Send to specific device' : 'Send to all devices'}
           </button>
         </section>
           <div className="relative min-h-[360px]">

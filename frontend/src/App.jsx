@@ -50,11 +50,11 @@ export default function App() {
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-flame text-flame-ink"><Flame size={22} strokeWidth={2.4} /></span>
             <div>
               <h1 className="text-lg font-bold leading-tight">FCM Demo</h1>
-              <p className="text-sm text-white/70">Thông báo đẩy với Firebase và Spring Boot</p>
+              <p className="text-sm text-white/70">Push notifications with Firebase and Spring Boot</p>
             </div>
           </div>
           <div role="tablist" aria-label="Vai trò" className="flex gap-1 rounded-xl bg-white/10 p-1">
-            {tabBtn('lecturer', 'Máy của tôi')}
+            {tabBtn('lecturer', 'My Device')}
             {tabBtn('admin', 'Admin')}
           </div>
         </div>

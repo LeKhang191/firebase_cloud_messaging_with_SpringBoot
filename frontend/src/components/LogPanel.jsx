@@ -20,7 +20,7 @@ export default function LogPanel({ entries, onClear }) {
         <button type="button" onClick={onClear} className="font-mono text-xs text-white/60 underline underline-offset-2 hover:text-white">clear</button>
       </div>
       <div ref={box} className="flex-1 space-y-1 overflow-auto px-4 py-3 font-mono text-[12.5px] leading-relaxed" aria-live="polite">
-        {entries.length === 0 && <p className="text-white/50">$ Chưa có lệnh nào. Mỗi request gửi lên server và mỗi thông báo nhận được sẽ hiện ở đây.</p>}
+        {entries.length === 0 && <p className="text-white/50">$ No command found. Every request sent to the server and every message received will appear here.</p>}
         {entries.map((e) => (
           <p key={e.id} className={`whitespace-pre-wrap break-all ${tone[e.level] || tone.info}`}>
             <span className="text-white/35">{e.time}</span>{'  '}{e.text}

@@ -6,33 +6,33 @@ import Notice from '../components/Notice';
 import LogPanel from '../components/LogPanel';
 import { errorText, sendSelfTest } from '../lib/api';
 
-const DEFAULT_TITLE = 'Test thiết bị';
-const DEFAULT_BODY = 'FCM push test thành công!';
+const DEFAULT_TITLE = 'Device test';
+const DEFAULT_BODY = 'FCM push test successful!';
 
 function PhaseNotice({ phase }) {
   switch (phase) {
     case 'noconfig':
       return (
-        <Notice tone="error" title="Máy chủ chưa có cấu hình Firebase">
-          Tạo file <b>src/main/resources/static/firebase-config.js</b> từ file mẫu, điền thông tin Firebase và VAPID key, rồi tải lại trang.
+        <Notice tone="error" title="Server has no Firebase configuration">
+          Create the file <b>src/main/resources/static/firebase-config.js</b> from the template, fill in the Firebase and VAPID key information, then reload the page.
         </Notice>
       );
     case 'ios-install':
       return (
-        <Notice tone="warn" title="Trên iPhone/iPad cần thêm trang vào Màn hình chính">
-          Mở trong Safari, bấm nút Chia sẻ, chọn <b>Thêm vào MH chính</b>, rồi mở lại từ biểu tượng vừa tạo (iOS 16.4 trở lên).
+        <Notice tone="warn" title="On iPhone/iPad, you need to add the page to the Home Screen">
+          Open in Safari, tap the Share button, select <b>Add to Home Screen</b>, then open again from the created icon (iOS 16.4 and above).
         </Notice>
       );
     case 'unsupported':
       return (
-        <Notice tone="error" title="Trình duyệt này không nhận được thông báo đẩy">
-          Dùng Chrome, Edge hoặc Firefox bản mới nhất. Brave tắt dịch vụ Google theo mặc định. Trang phải chạy bằng HTTPS (hoặc localhost).
+        <Notice tone="error" title="This browser does not support push notifications">
+          Use Chrome, Edge or Firefox latest versions. Brave disables Google services by default. The page must be served over HTTPS (or localhost).
         </Notice>
       );
     case 'denied':
       return (
-        <Notice tone="error" title="Thông báo đang bị chặn cho trang này">
-          Bấm biểu tượng ổ khóa cạnh thanh địa chỉ, đổi <b>Thông báo</b> sang <b>Cho phép</b>, rồi tải lại trang.
+        <Notice tone="error" title="Push notifications are blocked for this page">
+          Click the lock icon next to the address bar, change <b>Notifications</b> to <b>Allow</b>, then reload the page.
         </Notice>
       );
     default:
@@ -68,31 +68,31 @@ export default function LecturerPage({ fcm, log, logs = [], onClearLogs }) {
 
       <section className="panel" aria-labelledby="connect-h">
         <h2 id="connect-h" className="flex items-center gap-2 text-lg font-bold">
-          <Laptop size={20} /> Kết nối thiết bị này
+          <Laptop size={20} /> Connect this device
         </h2>
         <p className="mt-1 text-sm text-muted">
-          Đặt một cái tên để người trình bày nhận ra máy của bạn trong danh sách, rồi cho phép thông báo.
+          Set a name so the presenter can identify your device in the list, then allow notifications.
         </p>
 
         <div className="mt-4 max-w-md">
-          <label htmlFor="user-name" className="mb-1.5 block text-sm font-medium">Tên thiết bị</label>
+          <label htmlFor="user-name" className="mb-1.5 block text-sm font-medium">Device Name</label>
           <input id="user-name" className="field" value={name} maxLength={60} disabled={connected || connecting}
-                 placeholder="Ví dụ: Laptop Dell, Điện thoại…" onChange={(e) => setName(e.target.value)} />
+                 placeholder="e.g., Dell Laptop, Phone…" onChange={(e) => setName(e.target.value)} />
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
           {connected ? (
             <>
               <span className="inline-flex items-center gap-2 rounded-lg bg-ok/10 px-3 py-2 text-sm font-semibold text-ok">
-                <span className="h-2 w-2 rounded-full bg-ok" /> Đã kết nối với tên “{name}”
+                <span className="h-2 w-2 rounded-full bg-ok" /> Connected with name “{name}”
               </span>
-              <button type="button" className="btn btn-quiet" onClick={disconnect}>Hủy kết nối</button>
+              <button type="button" className="btn btn-quiet" onClick={disconnect}>Disconnect</button>
             </>
           ) : (
             <button type="button" className="btn btn-primary" disabled={blocked || connecting || !name.trim()}
                     onClick={() => connect(name)}>
               {connecting && <Loader2 size={18} className="animate-spin" />}
-              {connecting ? 'Đang cấp quyền…' : 'Bật nhận thông báo'}
+              {connecting ? 'Granting permission…' : 'Enable Notifications'}
             </button>
           )}
         </div>
@@ -102,9 +102,9 @@ export default function LecturerPage({ fcm, log, logs = [], onClearLogs }) {
         <section className="panel flex flex-col justify-between" aria-labelledby="test-h">
           <div>
             <h2 id="test-h" className="flex items-center gap-2 text-lg font-bold">
-              <Send size={18} /> Gửi thử cho chính thiết bị này
+              <Send size={18} /> Test sending to this device
             </h2>
-            <p className="mt-1 text-sm text-muted">Sửa nội dung tùy ý, bấm gửi và nhìn thông báo hiện lên.</p>
+            <p className="mt-1 text-sm text-muted">Modify the content as needed, click send, and observe the notification appear.</p>
             <div className="mt-4">
               <MessageForm title={title} body={body} onTitle={setTitle} onBody={setBody}
                            defaultTitle={DEFAULT_TITLE} defaultBody={DEFAULT_BODY} optional />
@@ -113,9 +113,9 @@ export default function LecturerPage({ fcm, log, logs = [], onClearLogs }) {
           <div className="mt-5">
             <button type="button" className="btn btn-primary" disabled={!connected || sending} onClick={testSelf}>
               {sending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-              {sending ? 'Đang gửi…' : 'Gửi thử'}
+              {sending ? 'Sending…' : 'Test Send'}
             </button>
-            {!connected && <p className="mt-2 text-sm text-muted">Hãy kết nối thiết bị ở bước trên trước.</p>}
+            {!connected && <p className="mt-2 text-sm text-muted">Please connect the device in the step above first.</p>}
           </div>
         </section>
 
