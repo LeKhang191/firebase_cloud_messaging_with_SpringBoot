@@ -73,21 +73,24 @@ function Get-JavacMajor([string]$javacExe) {
 
 function Use-Jdk {
     if ($env:FCM_FORCE_PORTABLE_TOOLS -ne '1') {
-        $java  = Get-Command java  -ErrorAction SilentlyContinue
-        $javac = Get-Command javac -ErrorAction SilentlyContinue
+        $java  = @(Get-Command java -CommandType Application -ErrorAction SilentlyContinue)[0]
+        $javac = @(Get-Command javac -CommandType Application -ErrorAction SilentlyContinue)[0]
         if ($java -and $javac) {
             $v = Get-JavaMajor $java.Source
             $cv = Get-JavacMajor $javac.Source
             if ($v -ge $MinJava -and $v -le $MaxJava -and $v -eq $cv) {
-                $home = $null
-                if ($env:JAVA_HOME -and (Test-Path (Join-Path $env:JAVA_HOME 'bin\javac.exe'))) {
-                    $home = $env:JAVA_HOME.Trim().Trim('"')
-                } else {
-                    $home = (Get-Item -LiteralPath $javac.Source).Directory.Parent.FullName
+                # Take the home of the java that was actually version-checked (a stale JAVA_HOME must not override it)
+                $jdkHome = $null
+                $eapJ = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+                try { $props = (& $java.Source -XshowSettings:properties -version 2>&1 | Out-String) } catch { $props = '' }
+                $ErrorActionPreference = $eapJ
+                if ($props -match '(?m)^\s*java\.home\s*=\s*(.+?)\s*$') { $jdkHome = $Matches[1] }
+                if (-not $jdkHome -or -not (Test-Path (Join-Path $jdkHome 'bin\javac.exe'))) {
+                    $jdkHome = (Get-Item -LiteralPath $javac.Source).Directory.Parent.FullName
                 }
-                if ($home -and (Test-Path (Join-Path $home 'bin\java.exe'))) {
-                    $env:JAVA_HOME = $home
-                    $env:PATH = (Join-Path $home 'bin') + ';' + $env:PATH
+                if ($jdkHome -and (Test-Path (Join-Path $jdkHome 'bin\java.exe'))) {
+                    $env:JAVA_HOME = $jdkHome
+                    $env:PATH = (Join-Path $jdkHome 'bin') + ';' + $env:PATH
                 }
                 Ok "Use system JDK $v."
                 return
@@ -125,7 +128,7 @@ function Get-MavenVersion([string]$mvnExe) {
 
 function Use-Maven {
     if ($env:FCM_FORCE_PORTABLE_TOOLS -ne '1') {
-        $mvn = Get-Command mvn -ErrorAction SilentlyContinue
+        $mvn = @(Get-Command mvn.cmd, mvn -ErrorAction SilentlyContinue)[0]
         if ($mvn) {
             $version = Get-MavenVersion $mvn.Source
             if (Test-MavenCompatible $version) { Ok "Use system Maven $version."; return }
