@@ -277,7 +277,13 @@ if [ "$BUILD_FRONTEND" -eq 1 ]; then
   [[ "$node_major" =~ ^[0-9]+$ ]] && [ "$node_major" -ge 18 ] || die "Node.js 18+ is required; found $(node --version)."
   command -v npm >/dev/null 2>&1 || die "npm is required to build the frontend."
   say "Building React frontend..."
-  bash "$ROOT/build-frontend.sh"
+  [ -f "$ROOT/frontend/package.json" ] || die "frontend/package.json was not found."
+  STATIC_DIR="$ROOT/src/main/resources/static"
+  ( cd "$ROOT/frontend" && npm install --no-audit --no-fund && npm run build ) || die "Frontend build failed."
+  [ -f "$ROOT/frontend/dist/index.html" ] || die "Frontend build did not create frontend/dist/index.html."
+  mkdir -p "$STATIC_DIR"
+  rm -rf "$STATIC_DIR/assets"
+  cp -r "$ROOT/frontend/dist/." "$STATIC_DIR/"
   ok "Frontend build completed."
   if [ "$BUILD_ONLY" -eq 1 ]; then exit 0; fi
 fi
